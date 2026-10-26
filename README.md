@@ -16,11 +16,15 @@ Screenshots use sample media in the browser preview. The plugin follows your Obs
 
 ![Import destination and layout settings](docs/images/settings.jpg)
 
-Choose a default folder for added media from the gallery's gear button or **Settings → Media Hub**. Pick an existing vault folder, enter a new folder path, or leave the path empty to use the vault root. The folder pane can be collapsed to give your media more room.
+Choose a default folder for added media from the gallery's gear button or **Settings → Media Hub**. Pick an existing vault folder, enter a new folder path, or leave the path empty to use the vault root. The folder pane can be collapsed to give your media more room. Personalize thumbnail crop or fit, compact spacing, filenames, card details, video thumbnails, and the default sort order.
 
 ![Download selected files in their original formats](docs/images/downloads.jpg)
 
 Save media copies to your device from the selection toolbar or expanded preview. Each file keeps its original format. On desktop, use individual save buttons or save the selection. On Android, save directly into a new folder inside Documents/Media Hub; the dialog reports the destination and any failed copies.
+
+![Video card showing an early thumbnail frame](docs/images/video-thumbnail.jpg)
+
+Video cards show an early frame where the device supports the codec. Playback starts only after opening the preview; thumbnail generation can be disabled in settings.
 
 ## Manual installation
 
@@ -40,7 +44,7 @@ Use a test vault for your first run. This plugin has automated tests but has not
 
 - **Add media:** select one or several files to copy into your vault. The default import folder is `Media`; change it in **Settings → Media Hub** or with the gallery gear button. Nested folders are created on the first import. Existing files are preserved, and duplicate names get numbered suffixes such as `photo (1).png`. Originals remain where they are.
 - **Collapsible folder pane:** use the panel button beside the title. The choice is saved across sessions.
-- **Gallery settings:** choose an existing folder or enter a new vault-relative path, set thumbnail size, and control pane visibility. On Obsidian 1.13+, the settings are also searchable.
+- **Gallery settings:** choose an existing folder or enter a new vault-relative path, set thumbnail size, control pane visibility, choose crop or fit, use compact spacing, show or hide filenames and card details, enable video thumbnails, and set the default sort order for new gallery views. On Obsidian 1.13+, the settings are also searchable.
 
 - Discovers media files already in the vault and updates after files are added, modified, renamed, moved, or deleted.
 - Separate All media, Images, GIFs, Videos, Audio, and PDFs tabs.
@@ -52,9 +56,9 @@ Use a test vault for your first run. This plugin has automated tests but has not
 - Editable filename in the details panel: change the name and click **Rename file**, press Enter, or use **Save details** to apply the name together with tags and description. The extension and folder stay the same. Duplicate and invalid names are rejected. Obsidian manages updates to linked notes according to your vault settings. Gallery tags and unsaved detail edits stay attached when you rename from this panel.
 - File path, format, size, file-system dates, image dimensions, or playback duration in the details panel.
 - **Tag chips:** type a tag and press Enter or comma; remove a chip with ×. Existing tags appear as suggestions, with mouse or arrow-key selection. Click **Save details** before switching files. Tags are normalized to lowercase and deduplicated.
-- **Multiple selection:** check media cards, Shift-click for a range, or use **Select all** for all matching files, including cards not yet loaded. Changing filters clears selections that are no longer visible. Bulk **Add tags** preserves existing tags and descriptions.
+- **Multiple selection:** check media cards, Shift-click for a range, or use **Select all** for all matching files, including cards not yet loaded. The button changes to **Deselect all** when every matching file is selected. Switching media-type tabs clears the current selection and closes the preview. The sidebar’s All media entry also resets type, tag, folder, and search filters. Other filter changes clear selections that are no longer visible. Bulk **Add tags** preserves existing tags and descriptions.
 - **Collections:** create a group with the + beside Collections, or select files and use **Add to collection** to choose an existing group or create one. Membership follows renames and folder moves observed while the plugin is running.
-- **Download:** save original files from the selection toolbar or preview. Multiple files remain separate, with individual save buttons if your device blocks bulk downloads. On Android, the button copies files directly to a new folder inside **Documents/Media Hub**, using the native file bridge supplied by Obsidian. Each download creates a unique folder, and duplicate filenames get numbered suffixes. Storage permission may be requested on older Android versions. Missing native support, permission denial, and partial failures are reported. The Share button has been removed. Files remain in the vault. Desktop exports are prepared in memory and limited to 512 MB per selection. Android uses native file copies; this path has automated bridge tests but still needs verification on a physical device. iOS device saving remains unverified.
+- **Download:** save original files from the selection toolbar or preview. Multiple files remain separate, with individual save buttons if your device blocks bulk downloads. On Android, the button writes original file bytes directly to a new folder inside **Documents/Media Hub**, using the native file bridge supplied by Obsidian. Each download creates a unique folder, and duplicate filenames get numbered suffixes. Storage permission may be requested on older Android versions. Missing native support, permission denial, and partial failures are reported. The Share button has been removed. Files remain in the vault. Desktop exports are prepared in memory and limited to 512 MB per selection. Android reads files through Obsidian’s vault API and writes them in chunks through the native file bridge, verifying output size and showing progress, errors, and a timeout; this path has automated bridge tests but still needs verification on a physical device. iOS device saving remains unverified.
 - **Deletion:** **Remove from collection** keeps files in the vault and other collections. **Delete files** confirms the selected count and exact file paths before using Obsidian’s trash handling. Files renamed or replaced after confirmation are skipped; failures are reported.
 - Previous/next buttons and left/right arrow navigation; Escape closes the preview when outside a form or player.
 - Opens the original file in a separate Obsidian tab. PDFs open in Obsidian's reader.
@@ -64,7 +68,7 @@ Use a test vault for your first run. This plugin has automated tests but has not
 
 Recognizes common image, video, audio, GIF, and PDF extensions, including HEIC, TIFF, AVI, and MKV. Recognition does **not** guarantee a preview: decoding depends on Obsidian and your device. Unsupported formats show a fallback. No transcoder, external service, or AI categorization is included.
 
-To discover media, the gallery enumerates vault file paths locally; it does not upload file paths or media. It lists files exposed by Obsidian's Vault API, not hidden system folders or remote media embedded in notes. Images use browser lazy loading; videos and audio are loaded only in the selected preview. GIF thumbnails animate when loaded. The initial grid renders 80 items, then loads more as you scroll (with a manual button as fallback). The grid is incremental rather than fully virtualized; thumbnails are not pre-generated or cached separately, so very large original images can still use significant memory.
+To discover media, the gallery enumerates vault file paths locally; it does not upload file paths or media. It lists files exposed by Obsidian's Vault API, not hidden system folders or remote media embedded in notes. Images use browser lazy loading; audio is loaded only in the selected preview. With video thumbnails enabled, visible grid pages preload video metadata and seek to an early frame without autoplay; turn thumbnails off in settings to reduce video loading. Unsupported codecs retain the video icon fallback. GIF thumbnails animate when loaded. The initial grid renders 80 items, then loads more as you scroll (with a manual button as fallback). The grid is incremental rather than fully virtualized; thumbnails are not pre-generated or cached separately, so very large original images can still use significant memory.
 
 ## Where tags and collections are stored
 
@@ -104,6 +108,14 @@ Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public Lice
 If Media Hub is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
 
 ## Updates
+
+### 0.4.0
+
+- Make media tabs override checked selection and close the preview.
+- Add a Select all/Deselect all toggle and reset filters from the sidebar’s All media entry.
+- Add video thumbnail frames with a codec fallback.
+- Add thumbnail fit, compact spacing, label visibility, video thumbnail, and default sorting settings.
+- Replace Android path copies with chunked writes of vault bytes, native bridge fallback, progress, output-size checks, and detailed failures. Android still requires physical-device verification.
 
 ### 0.3.2
 

@@ -400,16 +400,59 @@ test('checked media does not block previous/next buttons or keyboard arrows from
 test('Android Download uses native Documents copies instead of browser downloads or sharing', async () => {
   const { doc, dom, plugin, view, click } = await setup();
   const copied: any[] = [];
-  (dom.window as any).Capacitor = { Plugins: { Filesystem: { mkdir: async () => {}, copy: async (options: any) => { copied.push(options); } } } };
+  (dom.window as any).Capacitor = { Plugins: { Filesystem: { mkdir: async () => {}, writeFile: async (options: any) => { copied.push(options); }, appendFile: async () => {} } } };
   plugin.app.vault.adapter = new module.exports.MockCapacitorAdapter();
-  plugin.app.vault.readBinary = async () => { throw new Error('Android should copy natively'); };
+  plugin.app.vault.readBinary = async () => new Uint8Array([1, 2, 3]).buffer;
   module.exports.MockPlatform.isAndroidApp = true;
   try {
     click('Select all'); click('Download'); await tick();
     assert.equal(doc.querySelector('[aria-label="Share / Save to Files"]'), null);
     click('Save to device'); await tick();
     assert.equal(copied.length, 5);
-    assert.equal(copied[0].toDirectory, 'DOCUMENTS');
+    assert.equal(copied[0].directory, 'DOCUMENTS');
     assert.match(doc.querySelector('.vg-action-modal')!.textContent!, /Saved 5 of 5/);
   } finally { module.exports.MockPlatform.isAndroidApp = false; await view.onClose(); }
+});
+
+test('media tabs override checked selection and preview; select all toggles to deselect all', async () => {
+  const { doc, view, click } = await setup();
+  click('Preview photo.jpg'); click('Select all');
+  assert.equal(doc.querySelectorAll('.vg-select-checkbox:checked').length, 5);
+  click('Deselect all');
+  assert.equal(doc.querySelectorAll('.vg-select-checkbox:checked').length, 0);
+  click('Select all'); click('Videos');
+  assert.equal(doc.querySelectorAll('.vg-card').length, 1);
+  assert.equal(doc.querySelectorAll('.vg-select-checkbox:checked').length, 0);
+  assert.equal(doc.querySelector<HTMLElement>('.vg-preview')!.hidden, true);
+  assert.equal(doc.querySelector('[aria-label="Preview video.mp4"]') !== null, true);
+  click('All media'); assert.equal(doc.querySelectorAll('.vg-card').length, 5);
+  await view.onClose();
+});
+test('personalization saves and applies fit, density, labels, videos and default sort', async () => {
+  const { doc, plugin, view, click } = await setup();
+  click('Gallery settings');
+  doc.querySelector<HTMLSelectElement>('[aria-label="Thumbnail fit"]')!.value = 'contain';
+  doc.querySelector<HTMLSelectElement>('[aria-label="Default sort order"]')!.value = 'name';
+  doc.querySelector<HTMLInputElement>('[aria-label="Compact spacing"]')!.checked = true;
+  doc.querySelector<HTMLInputElement>('[aria-label="Show filenames"]')!.checked = false;
+  doc.querySelector<HTMLInputElement>('[aria-label="Show tags and file details on cards"]')!.checked = false;
+  doc.querySelector<HTMLInputElement>('[aria-label="Show video thumbnails"]')!.checked = false;
+  const save = [...doc.querySelectorAll('button')].find(node => node.textContent === 'Save settings')!;
+  save.click(); await tick();
+  assert.equal(plugin.stored.thumbnailFit, 'contain'); assert.equal(plugin.stored.defaultSort, 'name');
+  assert.equal(doc.querySelector('.vg-root')!.classList.contains('vg-compact'), true);
+  assert.equal(doc.querySelector('.vg-root')!.classList.contains('vg-hide-filenames'), true);
+  assert.equal(doc.querySelector('.vg-video-thumbnail'), null);
+  await view.onClose();
+});
+test('video cards prepare a muted thumbnail frame without autoplay and retain fallback on errors', async () => {
+  const { doc, dom, view, click } = await setup();
+  click('Videos');
+  const thumb = doc.querySelector<HTMLVideoElement>('.vg-video-thumbnail')!;
+  assert.ok(thumb); assert.equal(thumb.muted, true); assert.equal(thumb.autoplay, false);
+  assert.equal(thumb.preload, 'metadata');
+  thumb.dispatchEvent(new dom.window.Event('loadeddata')); assert.equal(thumb.classList.contains('is-ready'), true);
+  thumb.dispatchEvent(new dom.window.Event('error')); assert.equal(doc.querySelector('.vg-video-thumbnail'), null);
+  assert.match(doc.querySelector('.vg-thumb')!.textContent!, /Select to play/);
+  await view.onClose();
 });

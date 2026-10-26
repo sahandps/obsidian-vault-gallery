@@ -164,3 +164,11 @@
 .vg-download-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 12px; border-bottom: 1px solid var(--background-modifier-border); }
 .vg-download-row span { overflow-wrap: anywhere; min-width: 0; }
 .vg-download-row button { flex-shrink: 0; }
+.vg-root[data-fit="contain"] .vg-thumb img, .vg-root[data-fit="contain"] .vg-thumb video { object-fit: contain; }
+.vg-root.vg-compact .vg-grid { gap: 9px; }
+.vg-root.vg-compact .vg-card-info { padding: 7px 9px; }
+.vg-root.vg-hide-filenames .vg-card-name, .vg-root.vg-hide-subtitles .vg-card-subtitle { display: none; }
+.vg-video-thumbnail { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; pointer-events: none; opacity: 0; }
+.vg-video-thumbnail.is-ready { opacity: 1; }
+.vg-thumb .vg-badge { z-index: 1; }
+.vg-tabs { position: relative; z-index: 3; }

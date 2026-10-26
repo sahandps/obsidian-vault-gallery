@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { Modal, PluginSettingTab, TFolder, type App, type Setting } from 'obsidian';
 import type MediaHubPlugin from './main';
-import { normalizeImportFolder } from './model';
+import { normalizeImportFolder, type SortOrder } from './model';
 
 function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): void {
   container.replaceChildren();
@@ -32,6 +32,24 @@ function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): void {
   const size = sizeLabel.createEl('input', { type: 'range' });
   size.min = '140'; size.max = '360'; size.step = '10'; size.value = String(plugin.data.thumbnailSize);
   size.setAttribute('aria-label', 'Default thumbnail size');
+  const choices = (title: string, values: string[][], value: string) => {
+    const label = container.createEl('label', { cls: 'vg-setting-field' });
+    label.createSpan({ text: title });
+    const control = label.createEl('select'); control.setAttribute('aria-label', title);
+    for (const [key, text] of values) control.createEl('option', { value: key, text });
+    control.value = value; return control;
+  };
+  const fit = choices('Thumbnail fit', [['cover', 'Fill and crop'], ['contain', 'Show whole image']], plugin.data.thumbnailFit);
+  const sort = choices('Default sort order', [['newest', 'Recently modified'], ['oldest', 'Oldest modified'], ['name', 'Name A–Z'], ['largest', 'Largest first']], plugin.data.defaultSort);
+  const toggle = (title: string, checked: boolean) => {
+    const label = container.createEl('label', { cls: 'vg-setting-check' });
+    const input = label.createEl('input', { type: 'checkbox' }); input.checked = checked;
+    input.setAttribute('aria-label', title); label.createSpan({ text: title }); return input;
+  };
+  const compact = toggle('Compact spacing', plugin.data.compact);
+  const filenames = toggle('Show filenames', plugin.data.showFilenames);
+  const subtitles = toggle('Show tags and file details on cards', plugin.data.showSubtitles);
+  const videoThumbnails = toggle('Show video thumbnails', plugin.data.videoThumbnails);
   const status = container.createEl('p', { cls: 'vg-setting-hint' });
   status.setAttribute('role', 'status');
   const save = container.createEl('button', { cls: 'mod-cta', text: 'Save settings' });
@@ -47,11 +65,15 @@ function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): void {
         status.textContent = error instanceof Error ? error.message : 'Invalid folder path.';
         return;
       }
-      const previous = { importFolder: plugin.data.importFolder, sidebarCollapsed: plugin.data.sidebarCollapsed, thumbnailSize: plugin.data.thumbnailSize };
+      const previous = { ...plugin.data };
       plugin.data.importFolder = path;
       plugin.data.sidebarCollapsed = collapsed.checked;
       plugin.data.thumbnailSize = Number(size.value);
-      const controls = [folder, existing, collapsed, size, save];
+      plugin.data.thumbnailFit = fit.value as 'cover' | 'contain';
+      plugin.data.defaultSort = sort.value as SortOrder;
+      plugin.data.compact = compact.checked; plugin.data.showFilenames = filenames.checked;
+      plugin.data.showSubtitles = subtitles.checked; plugin.data.videoThumbnails = videoThumbnails.checked;
+      const controls = [folder, existing, collapsed, size, fit, sort, compact, filenames, subtitles, videoThumbnails, save];
       controls.forEach(control => { control.disabled = true; }); status.textContent = 'Saving…';
       try {
         await plugin.persist();
@@ -59,9 +81,7 @@ function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): void {
         plugin.applyViewSettings();
         status.textContent = 'Settings saved.';
       } catch (error) {
-        plugin.data.importFolder = previous.importFolder;
-        plugin.data.sidebarCollapsed = previous.sidebarCollapsed;
-        plugin.data.thumbnailSize = previous.thumbnailSize;
+        Object.assign(plugin.data, { importFolder: previous.importFolder, sidebarCollapsed: previous.sidebarCollapsed, thumbnailSize: previous.thumbnailSize, thumbnailFit: previous.thumbnailFit, defaultSort: previous.defaultSort, compact: previous.compact, showFilenames: previous.showFilenames, showSubtitles: previous.showSubtitles, videoThumbnails: previous.videoThumbnails });
         status.textContent = 'Could not save settings. Try again.';
         plugin.reportSaveError(error);
       } finally { controls.forEach(control => { control.disabled = false; }); }
@@ -75,7 +95,7 @@ export class GallerySettingsTab extends PluginSettingTab {
   getSettingDefinitions() {
     return [{
       name: 'Media import and layout',
-      aliases: ['Default media folder', 'Thumbnail size', 'Collapse folder pane'],
+      aliases: ['Default media folder', 'Thumbnail size', 'Collapse folder pane', 'Thumbnail fit', 'Compact spacing', 'Video thumbnails', 'Default sort order'],
       render: (setting: Setting) => {
         setting.settingEl.classList.add('vg-settings-row');
         renderSettings(setting.settingEl, this.plugin);

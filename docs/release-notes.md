@@ -1,10 +1,10 @@
-Media Hub 0.3.2 adds direct Android saves and improves navigation with checked media.
+Media Hub 0.4.0 improves selection, video previews, personalization, and Android saving.
 
-**Download on Android** now copies the selected original files into a new folder inside **Documents/Media Hub**, rather than relying on browser download links. The dialog reports the exact destination and any failed files. Each download creates a new folder; duplicate names receive numbered suffixes. Older Android versions may ask for storage permission. If Obsidian does not expose the required native file bridge, the dialog reports that saving is unavailable.
+Switching media-type tabs now clears checkbox selection and closes the preview. **Select all** becomes **Deselect all** when all matching files are checked. The sidebar’s **All media** entry resets the type, folder, tag, and search filters.
 
-The **Share** button and all sharing behavior have been removed. Desktop downloads still save individual original files, with no ZIP archive. Vault originals remain unchanged. This Android path has automated tests with a mocked native bridge; physical-device verification is still needed.
+Video cards display an early thumbnail frame when the codec is supported, without autoplay. Unsupported videos retain an icon fallback. **Gallery settings** now includes crop/fit, compact spacing, filename visibility, card-detail visibility, video thumbnails, and the default sort order for new views.
 
-Preview navigation now accepts left/right keys while checkboxes have focus, keeps arrow-button focus, and avoids scrolling the preview again on every previous/next action. Checked files remain selected while browsing.
+Android downloads now read bytes using Obsidian’s vault API and write them in chunks to a new folder under **Documents/Media Hub**. This avoids relying on native paths for vaults backed by content URIs. The download dialog shows progress, preserves error messages, times out unresponsive native calls, and verifies output size. The native bridge has an additional compatibility fallback. Automated tests pass; physical Android verification is still needed. Originals stay in the vault, with no ZIP and no Share button.
 
 Requires Obsidian **1.7.2+**. Licensed under **GPL-3.0-only**.
 
@@ -12,7 +12,7 @@ Requires Obsidian **1.7.2+**. Licensed under **GPL-3.0-only**.
 
 ### Updates
 
-- Direct Android copies to Documents/Media Hub with destination and failure reporting.
-- Remove Share button and native sharing calls.
-- Improve checked-media preview navigation and focus handling.
-- Add permission, duplicate-name, partial-failure, and navigation regression tests.
+- Tab switching overrides selection; Select all/Deselect all toggle.
+- Video thumbnails with codec fallback and a settings toggle.
+- Six additional personalization controls.
+- Android vault-byte exports with chunked writes, progress, verification, and actionable errors.

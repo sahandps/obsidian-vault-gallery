@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { ItemView, Notice, Plugin, Platform, CapacitorAdapter, TFile, TFolder, WorkspaceLeaf, setIcon } from 'obsidian';
+import { ItemView, Notice, Plugin, Platform, TFile, TFolder, WorkspaceLeaf, setIcon } from 'obsidian';
 import {
   createCollection, filterMedia, formatSize, getMetadata, importPath, mediaAccept, mediaKind, normalizeImportFolder, moveMetadata, parseTags,
   removeMetadata, renamedPath, sanitizeData, type Filters, type GalleryData, type MediaKind, type SortOrder,
@@ -198,6 +198,7 @@ export default class MediaHubPlugin extends Plugin {
 export class GalleryView extends ItemView {
   private filters: Filters = { query: '', kind: 'all', folder: null, tag: '', sort: 'newest' };
   private selectedPath: string | null = null;
+  private selectAllButton!: HTMLButtonElement;
   private selectedPaths = new Set<string>();
   private selectionAnchor: string | null = null;
   private selectionBar!: HTMLElement;
@@ -284,6 +285,7 @@ export class GalleryView extends ItemView {
     tabBar.setAttribute('aria-label', 'Media types');
     for (const kind of KINDS) {
       const tab = button(tabBar, kind.label, null, () => {
+        this.selectedPaths.clear(); this.selectionAnchor = null; this.select(null);
         this.filters.kind = kind.value;
         this.applyFilters();
       }, 'vg-tab');
@@ -337,12 +339,16 @@ export class GalleryView extends ItemView {
     const sectionHeading = el(scroll, 'div', 'vg-section-heading');
     this.folderTitle = el(sectionHeading, 'h2', '', 'All media');
     button(sectionHeading, 'Clear filters', null, () => {
-      this.filters = { query: '', kind: 'all', folder: null, tag: '', sort: 'newest' };
+      this.filters = { query: '', kind: 'all', folder: null, tag: '', sort: this.plugin.data.defaultSort };
       this.search.value = '';
-      sort.value = 'newest';
+      sort.value = this.plugin.data.defaultSort;
       this.refresh();
     }, 'vg-text-button');
-    button(sectionHeading, 'Select all', null, () => { this.selectedPaths = new Set(this.filtered.map(file => file.path)); this.syncSelection(); }, 'vg-text-button');
+    this.selectAllButton = button(sectionHeading, 'Select all', null, () => {
+      if (this.filtered.length && this.selectedPaths.size === this.filtered.length) { this.selectedPaths.clear(); this.selectionAnchor = null; }
+      else this.selectedPaths = new Set(this.filtered.map(file => file.path));
+      this.syncSelection();
+    }, 'vg-text-button');
     this.selectionBar = el(scroll, 'div', 'vg-selection-bar');
     this.selectionBar.setAttribute('aria-label', 'Selected file actions');
     this.selectionBar.hidden = true;
@@ -351,6 +357,7 @@ export class GalleryView extends ItemView {
     this.preview.setAttribute('aria-label', 'Selected media');
     this.grid = el(scroll, 'div', 'vg-grid');
     this.grid.setAttribute('aria-label', 'Media files');
+    this.filters.sort = this.plugin.data.defaultSort; sort.value = this.filters.sort;
     this.applySettings();
     this.registerDomEvent(root, 'keydown', event => {
       const target = event.target as HTMLElement;
@@ -397,7 +404,12 @@ export class GalleryView extends ItemView {
     this.sidebarToggle.setAttribute('aria-expanded', String(!this.plugin.data.sidebarCollapsed));
     this.sidebarToggle.title = this.plugin.data.sidebarCollapsed ? 'Show folder pane' : 'Hide folder pane';
     if (this.thumbnailSlider) this.thumbnailSlider.value = String(this.plugin.data.thumbnailSize);
+    this.contentEl.dataset.fit = this.plugin.data.thumbnailFit;
+    this.contentEl.classList.toggle('vg-compact', this.plugin.data.compact);
+    this.contentEl.classList.toggle('vg-hide-filenames', !this.plugin.data.showFilenames);
+    this.contentEl.classList.toggle('vg-hide-subtitles', !this.plugin.data.showSubtitles);
     this.setThumbnailSize();
+    if (this.grid) this.renderGrid();
   }
 
   private setThumbnailSize(): void {
@@ -421,7 +433,10 @@ export class GalleryView extends ItemView {
     el(this.sidebar, 'div', 'vg-sidebar-label', 'LIBRARY');
     const folderButton = (label: string, path: string | null, count: number, depth: number) => {
       const row = button(this.sidebar, label, null, () => {
-        this.filters.folder = path; this.filters.collection = null; this.renderFolders(); this.applyFilters();
+        this.filters.folder = path; this.filters.collection = null;
+        if (path === null) { this.filters.kind = 'all'; this.filters.tag = ''; this.filters.query = ''; this.search.value = ''; }
+        this.selectedPaths.clear(); this.selectionAnchor = null; this.select(null);
+        this.renderFolders(); this.applyFilters();
       }, 'vg-folder');
       row.setCssProps({ '--vg-depth': String(Math.min(depth, 5)) });
       row.title = path === null ? 'All media in the vault' : path || 'Vault root';
@@ -492,6 +507,7 @@ export class GalleryView extends ItemView {
 
   private renderGrid(): void {
     this.observer?.disconnect();
+    stopMedia(this.grid);
     this.grid.replaceChildren();
     if (this.filtered.length === 0) {
       const empty = el(this.grid, 'div', 'vg-empty');
@@ -556,6 +572,15 @@ export class GalleryView extends ItemView {
       thumb.classList.add(`vg-thumb-${kind}`);
       setIcon(el(thumb, 'span', 'vg-file-icon'), KINDS.find(item => item.value === kind)!.icon);
       el(thumb, 'span', 'vg-no-preview', kind === 'video' ? 'Select to play' : kind === 'audio' ? 'Select to listen' : 'PDF document');
+      if (kind === 'video' && this.plugin.data.videoThumbnails) {
+        const video = el(thumb, 'video', 'vg-video-thumbnail');
+        video.muted = true; video.playsInline = true; video.preload = 'metadata'; video.tabIndex = -1;
+        video.setAttribute('aria-hidden', 'true');
+        video.addEventListener('loadedmetadata', () => { if (video.duration > 0) video.currentTime = Math.min(0.1, video.duration / 2); }, { once: true });
+        video.addEventListener('loadeddata', () => { video.classList.add('is-ready'); }, { once: true });
+        video.addEventListener('error', () => video.remove(), { once: true });
+        video.src = `${this.app.vault.getResourcePath(file)}#t=0.1`;
+      }
     }
     el(thumb, 'span', 'vg-badge', file.extension.toUpperCase());
     const info = el(open, 'div', 'vg-card-info');
@@ -742,6 +767,11 @@ export class GalleryView extends ItemView {
       const checkbox = card.querySelector<HTMLInputElement>('.vg-select-checkbox');
       if (checkbox) checkbox.checked = selected;
     }
+    if (this.selectAllButton) {
+      const label = this.filtered.length && this.selectedPaths.size === this.filtered.length ? 'Deselect all' : 'Select all';
+      this.selectAllButton.textContent = label; this.selectAllButton.setAttribute('aria-label', label);
+      this.selectAllButton.disabled = !this.filtered.length;
+    }
     this.selectionBar.replaceChildren();
     this.selectionBar.hidden = !this.selectedPaths.size;
     if (!this.selectedPaths.size) return;
@@ -856,21 +886,25 @@ export class GalleryView extends ItemView {
       if (!owner) return;
       if (Platform.isAndroidApp) {
         const fs = androidFilesystem(owner);
-        const adapter = this.app.vault.adapter;
-        if (!fs || !(adapter instanceof CapacitorAdapter)) {
-          status.textContent = 'Direct saving is unavailable in this version of Obsidian. Update Obsidian and try again.';
+        if (!fs) {
+          status.textContent = 'Android file saving is unavailable. Please update Obsidian.';
           return;
         }
         status.textContent = 'Each download saves original files in a new folder at: Documents/Media Hub.';
         download.disabled = false;
         download.addEventListener('click', () => {
           download.disabled = true;
-          status.textContent = 'Saving files…';
-          const targets = paths.map(path => ({ path, source: adapter.getFullPath(path) }));
-          void saveAndroidFiles(fs, targets).then(result => {
-            status.textContent = `Saved ${result.saved.length} of ${paths.length} files to Documents/${result.folder}.${result.failed.length ? ` Could not save: ${result.failed.join(', ')}` : ''}`;
+          status.textContent = 'Starting download…';
+          const targets = paths.map(path => ({ path, read: async () => {
+            const file = this.app.vault.getFiles().find(item => item.path === path);
+            if (!file) throw new Error('File no longer exists.');
+            if (file.stat.size > EXPORT_LIMIT) throw new Error('Files larger than 512 MB cannot be downloaded.');
+            return this.app.vault.readBinary(file);
+          } }));
+          void saveAndroidFiles(fs, targets, message => { status.textContent = message; }).then(result => {
+            status.textContent = `Saved ${result.saved.length} of ${paths.length} files to Documents/${result.folder}.${result.failed.length ? ` Failed: ${result.failed.join('; ')}` : ''}`;
           }).catch((error: unknown) => {
-            status.textContent = error instanceof Error ? error.message : 'Could not save files to Documents.';
+            status.textContent = `Download failed: ${error instanceof Error ? error.message : String(error)}`;
           }).finally(() => { download.disabled = false; });
         });
         return;

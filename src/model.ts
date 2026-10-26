@@ -14,6 +14,12 @@ export interface GalleryData {
   thumbnailSize: number;
   importFolder: string;
   sidebarCollapsed: boolean;
+  thumbnailFit: 'cover' | 'contain';
+  compact: boolean;
+  showFilenames: boolean;
+  showSubtitles: boolean;
+  videoThumbnails: boolean;
+  defaultSort: SortOrder;
   metadata: Record<string, MediaMetadata>;
   collections: MediaCollection[];
 }
@@ -40,12 +46,15 @@ export function getMetadata(data: GalleryData, path: string): MediaMetadata {
     ? data.metadata[path] : { tags: [], description: '' };
 }
 export function sanitizeData(raw: unknown): GalleryData {
-  const data: GalleryData = { version: 1, thumbnailSize: 220, importFolder: 'Media', sidebarCollapsed: false, collections: [], metadata: Object.create(null) as Record<string, MediaMetadata> };
+  const data: GalleryData = { version: 1, thumbnailSize: 220, importFolder: 'Media', sidebarCollapsed: false, thumbnailFit: 'cover', compact: false, showFilenames: true, showSubtitles: true, videoThumbnails: true, defaultSort: 'newest', collections: [], metadata: Object.create(null) as Record<string, MediaMetadata> };
   if (!raw || typeof raw !== 'object') return data;
   const input = raw as Partial<GalleryData>;
   if (typeof input.thumbnailSize === 'number' && Number.isFinite(input.thumbnailSize)) {
     data.thumbnailSize = Math.min(360, Math.max(140, input.thumbnailSize));
   }
+  if (input.thumbnailFit === 'contain') data.thumbnailFit = 'contain';
+  for (const key of ['compact', 'showFilenames', 'showSubtitles', 'videoThumbnails'] as const) if (typeof input[key] === 'boolean') data[key] = input[key];
+  if (['newest', 'oldest', 'name', 'largest'].includes(input.defaultSort || '')) data.defaultSort = input.defaultSort!;
   if (typeof input.sidebarCollapsed === 'boolean') data.sidebarCollapsed = input.sidebarCollapsed;
   if (typeof input.importFolder === 'string') {
     try { data.importFolder = normalizeImportFolder(input.importFolder); } catch { /* Keep the safe default for older or malformed settings. */ }
