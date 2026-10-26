@@ -36,7 +36,7 @@ export function getMetadata(data: GalleryData, path: string): MediaMetadata {
     ? data.metadata[path] : { tags: [], description: '' };
 }
 export function sanitizeData(raw: unknown): GalleryData {
-  const data: GalleryData = { version: 1, thumbnailSize: 220, metadata: Object.create(null) };
+  const data: GalleryData = { version: 1, thumbnailSize: 220, metadata: Object.create(null) as Record<string, MediaMetadata> };
   if (!raw || typeof raw !== 'object') return data;
   const input = raw as Partial<GalleryData>;
   if (typeof input.thumbnailSize === 'number' && Number.isFinite(input.thumbnailSize)) {
@@ -97,7 +97,7 @@ export function formatSize(size: number): string {
 export function renamedPath(file: Pick<MediaFile, 'path' | 'name' | 'extension'>, input: string): string {
   const name = input.trim();
   if (!name || name === '.' || name === '..') throw new Error('Enter a file name.');
-  if (/[\\/:*?"<>|\x00-\x1f\x7f]/.test(name)) throw new Error('The name cannot contain slashes or these characters: : * ? " < > |');
+  if (/[\\/:*?"<>|]/.test(name) || [...name].some(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)) throw new Error('The name cannot contain slashes or these characters: : * ? " < > |');
   if (name.endsWith('.')) throw new Error('The name cannot end with a period.');
   if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) throw new Error('This name is reserved by the operating system.');
   const filename = `${name}.${file.extension}`;

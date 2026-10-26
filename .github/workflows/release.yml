@@ -4,6 +4,9 @@ on:
     tags: ['[0-9]*']
 permissions:
   contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -14,6 +17,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm run lint
       - run: npm test
       - run: npm run package
       - name: Validate release version
@@ -29,8 +33,15 @@ jobs:
             throw new Error('Tag, package, manifest, and versions.json must match');
           }
           JS
+      - name: Attest release assets
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
       - name: Publish installable release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
-        run: gh release create "$RELEASE_TAG" main.js manifest.json styles.css LICENSE --verify-tag --title "$RELEASE_TAG" --notes-file docs/release-notes.md
+        run: gh release create "$RELEASE_TAG" main.js manifest.json styles.css --verify-tag --title "$RELEASE_TAG" --notes-file docs/release-notes.md

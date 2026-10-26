@@ -1,26 +1,14 @@
 # Vault Gallery
 
-An Obsidian plugin that brings your vault's media into a searchable gallery. The layout follows the provided sketches: folder navigation on the left, media filters above a resizable grid, and an expanded preview with a details panel when you select a file.
-
-## Screenshots
-
-The screenshots show the production gallery view running in the browser preview with a sample vault. Actual Obsidian colors follow your theme.
-
 ![Media gallery with folders and filters](docs/images/gallery.jpg)
+
+Vault Gallery brings your vault's images, GIFs, videos, audio, and PDFs into one searchable media library. Browse by folder, filter by type or tag, and adjust the grid to see your media the way you prefer.
 
 ![Expanded preview with editable filename, tags, and description](docs/images/details.jpg)
 
-## Install with BRAT
+Select any item for a larger preview and file details. Zoom into images, play video and audio, rename files, and add tags or descriptions without leaving the gallery. Tags stay attached when files are renamed while the plugin is running.
 
-This plugin is not yet listed in Obsidian's Community plugins directory. To install from this repository:
-
-1. Install and enable **BRAT** from **Settings → Community plugins → Browse**.
-2. Open BRAT settings and choose **Add a beta plugin**.
-3. Paste `https://github.com/sahandps/obsidian-vault-gallery` and add the plugin.
-4. Enable **Vault Gallery** in Community plugins if BRAT has not enabled it.
-5. Click the images ribbon icon or run **Vault Gallery: Open gallery**.
-
-See the [BRAT installation guide](https://github.com/TfTHacker/obsidian42-brat) and [latest release](https://github.com/sahandps/obsidian-vault-gallery/releases/latest).
+Screenshots use sample media in the browser preview. The plugin follows your Obsidian theme.
 
 ## Manual installation
 
@@ -28,7 +16,7 @@ Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](
 
 ## Build and install from source
 
-1. Run `npm install` and `npm run package` in this project (Node.js 18 or newer).
+1. Run `npm ci` and `npm run package` in this project (Node.js 22 or newer).
 2. In your vault, create `.obsidian/plugins/vault-gallery/`.
 3. Copy `main.js`, `manifest.json`, and `styles.css` from `release/vault-gallery/` into that folder.
 4. Reload Obsidian. In **Settings → Community plugins**, enable **Vault Gallery**. Community plugins must be enabled.
@@ -36,7 +24,7 @@ Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](
 
 Use a test vault for your first run. This plugin has automated tests but has not yet been verified inside a running Obsidian app.
 
-## Included
+## Features
 
 - Discovers media files already in the vault and updates after files are added, modified, renamed, moved, or deleted.
 - Separate All media, Images, GIFs, Videos, Audio, and PDFs tabs.
@@ -56,7 +44,7 @@ Use a test vault for your first run. This plugin has automated tests but has not
 
 Recognizes common image, video, audio, GIF, and PDF extensions, including HEIC, TIFF, AVI, and MKV. Recognition does **not** guarantee a preview: decoding depends on Obsidian and your device. Unsupported formats show a fallback. No transcoder, external service, or AI categorization is included.
 
-The gallery lists files exposed by Obsidian's Vault API, not hidden system folders or remote media embedded in notes. Images use browser lazy loading; videos and audio are loaded only in the selected preview. GIF thumbnails animate when loaded. The initial grid renders 80 items, then loads more as you scroll (with a manual button as fallback). The grid is incremental rather than fully virtualized; thumbnails are not pre-generated or cached separately, so very large original images can still use significant memory.
+To discover media, the gallery enumerates vault file paths locally; it does not upload file paths or media. It lists files exposed by Obsidian's Vault API, not hidden system folders or remote media embedded in notes. Images use browser lazy loading; videos and audio are loaded only in the selected preview. GIF thumbnails animate when loaded. The initial grid renders 80 items, then loads more as you scroll (with a manual button as fallback). The grid is incremental rather than fully virtualized; thumbnails are not pre-generated or cached separately, so very large original images can still use significant memory.
 
 ## Where tags are stored
 
@@ -69,6 +57,7 @@ The dates shown are file-system created/modified dates, not camera capture dates
 ```sh
 npm install
 npm run dev      # rebuild main.js on changes
+npm run lint     # official Obsidian guidelines and TypeScript lint checks
 npm run build    # TypeScript check + production bundle
 npm test         # model and DOM integration tests
 npm run package  # installable folder under release/vault-gallery
@@ -87,4 +76,20 @@ Run `npm run preview`, then open **http://127.0.0.1:4173/**. This runs the produ
 
 ## Releases and license
 
-Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public License v3.0](LICENSE) (`GPL-3.0-only`). Continuous integration builds the plugin and runs its tests. To publish a new version, update `package.json`, `manifest.json`, `versions.json`, and `docs/release-notes.md`, then push a matching numeric Git tag (for example, `0.1.1`). GitHub Actions builds and attaches `main.js`, `manifest.json`, and `styles.css` to the release for BRAT and manual installation.
+Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public License v3.0](LICENSE) (`GPL-3.0-only`). Continuous integration builds the plugin and runs its tests. To publish a new version, update `package.json`, `manifest.json`, `versions.json`, and `docs/release-notes.md`, then push a matching numeric Git tag (for example, `0.1.1`). GitHub Actions builds and attaches `main.js`, `manifest.json`, and `styles.css` to the release for installation in Obsidian.
+
+
+## Updates
+
+### 0.1.1
+
+- Require Obsidian 1.7.2, matching the workspace API used to open the gallery.
+- Replace direct styles with CSS properties and classes; remove `!important` and `:has` selectors.
+- Use Obsidian element helpers, window timers, typed metadata snapshots, and portable filename validation.
+- Add official Obsidian lint checks to continuous integration.
+- Attest release assets through GitHub and publish only `main.js`, `manifest.json`, and `styles.css`.
+- Put product descriptions under the screenshots and simplify installation documentation.
+
+### 0.1.0
+
+- Initial gallery with folders, media filters, search, resizable thumbnails, previews, tags, descriptions, and filename editing.

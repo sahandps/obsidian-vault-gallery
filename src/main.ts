@@ -18,11 +18,7 @@ const KINDS: { value: MediaKind | 'all'; label: string; icon: string }[] = [
   { value: 'pdf', label: 'PDFs', icon: 'file-text' },
 ];
 function el<K extends keyof HTMLElementTagNameMap>(parent: HTMLElement, tag: K, cls = '', text = ''): HTMLElementTagNameMap[K] {
-  const node = parent.ownerDocument.createElement(tag);
-  node.className = cls;
-  if (text) node.textContent = text;
-  parent.appendChild(node);
-  return node;
+  return parent.createEl(tag, { cls, text });
 }
 function button(parent: HTMLElement, label: string, icon: string | null, action: () => void, cls = ''): HTMLButtonElement {
   const node = el(parent, 'button', cls);
@@ -46,7 +42,7 @@ function stopMedia(root: HTMLElement): void {
 export default class VaultGalleryPlugin extends Plugin {
   data: GalleryData = sanitizeData(null);
   private saveQueue: Promise<void> = Promise.resolve();
-  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private refreshTimer: number | undefined;
 
   async onload(): Promise<void> {
     try { this.data = sanitizeData(await this.loadData()); }
@@ -57,7 +53,7 @@ export default class VaultGalleryPlugin extends Plugin {
       return;
     }
     this.registerView(VIEW_TYPE, leaf => new GalleryView(leaf, this));
-    this.addRibbonIcon('images', 'Open vault gallery', () => { void this.activate(); });
+    this.addRibbonIcon('images', 'Open Vault Gallery', () => { void this.activate(); });
     this.addCommand({ id: 'open-gallery', name: 'Open gallery', callback: () => { void this.activate(); } });
     this.registerEvent(this.app.vault.on('create', () => this.scheduleRefresh()));
     this.registerEvent(this.app.vault.on('modify', () => this.scheduleRefresh()));
@@ -74,7 +70,7 @@ export default class VaultGalleryPlugin extends Plugin {
     }));
   }
 
-  onunload(): void { if (this.refreshTimer) clearTimeout(this.refreshTimer); }
+  onunload(): void { if (this.refreshTimer) window.clearTimeout(this.refreshTimer); }
 
   private views(): GalleryView[] {
     return this.app.workspace.getLeavesOfType(VIEW_TYPE).map(leaf => leaf.view as GalleryView);
@@ -93,13 +89,13 @@ export default class VaultGalleryPlugin extends Plugin {
     }
   }
   private scheduleRefresh(): void {
-    if (this.refreshTimer) clearTimeout(this.refreshTimer);
-    this.refreshTimer = setTimeout(() => this.refreshViews(), 180);
+    if (this.refreshTimer) window.clearTimeout(this.refreshTimer);
+    this.refreshTimer = window.setTimeout(() => this.refreshViews(), 180);
   }
   refreshViews(): void { for (const view of this.views()) view.refresh(); }
   persist(): Promise<void> {
     // Snapshot every write and serialize them, so a slow older write cannot replace newer tags.
-    const snapshot = JSON.parse(JSON.stringify(this.data));
+    const snapshot = sanitizeData(this.data);
     const write = this.saveQueue.catch(() => undefined).then(() => this.saveData(snapshot));
     this.saveQueue = write;
     return write;
@@ -253,7 +249,7 @@ export class GalleryView extends ItemView {
   }
 
   private setThumbnailSize(): void {
-    this.contentEl.style.setProperty('--vg-card-size', `${this.plugin.data.thumbnailSize}px`);
+    this.contentEl.setCssProps({ '--vg-card-size': `${this.plugin.data.thumbnailSize}px` });
   }
 
   private renderTagOptions(): void {
@@ -275,7 +271,7 @@ export class GalleryView extends ItemView {
       const row = button(this.sidebar, label, null, () => {
         this.filters.folder = path; this.renderFolders(); this.applyFilters();
       }, 'vg-folder');
-      row.style.setProperty('--vg-depth', String(Math.min(depth, 5)));
+      row.setCssProps({ '--vg-depth': String(Math.min(depth, 5)) });
       row.title = path === null ? 'All media in the vault' : path || 'Vault root';
       row.setAttribute('aria-pressed', String(this.filters.folder === path));
       row.replaceChildren();
@@ -417,6 +413,7 @@ export class GalleryView extends ItemView {
     }, 'vg-icon-button vg-close');
     const viewport = el(stage, 'div', 'vg-viewport');
     if (kind === 'image' || kind === 'gif') {
+      viewport.classList.add('vg-image-viewport');
       this.previewImage = el(viewport, 'img', 'vg-preview-image');
       this.previewImage.alt = file.name;
       this.previewImage.src = this.app.vault.getResourcePath(file);
@@ -424,7 +421,7 @@ export class GalleryView extends ItemView {
         dimensions.textContent = `${this.previewImage?.naturalWidth} × ${this.previewImage?.naturalHeight} px`;
       });
       this.previewImage.addEventListener('error', () => {
-        viewport.replaceChildren(); this.previewImage = null;
+        viewport.replaceChildren(); viewport.classList.remove('vg-image-viewport'); this.previewImage = null;
         this.renderUnavailable(viewport, 'This image format cannot be previewed on this device.');
       }, { once: true });
     } else if (kind === 'video' || kind === 'audio') {
@@ -474,7 +471,7 @@ export class GalleryView extends ItemView {
     const tagLabel = el(inspector, 'label', 'vg-field');
     el(tagLabel, 'span', '', 'Tags');
     const tags = el(tagLabel, 'input');
-    tags.type = 'text'; tags.value = metadata.tags.join(', '); tags.placeholder = 'travel, inspiration, work';
+    tags.type = 'text'; tags.value = metadata.tags.join(', '); tags.placeholder = 'Travel, inspiration, work';
     el(inspector, 'p', 'vg-hint', 'Separate tags with commas.');
     const descriptionLabel = el(inspector, 'label', 'vg-field');
     el(descriptionLabel, 'span', '', 'Description');
@@ -549,9 +546,8 @@ export class GalleryView extends ItemView {
   private setZoom(zoom: number): void {
     this.zoom = Math.min(4, Math.max(0.5, zoom));
     if (this.previewImage) {
-      this.previewImage.style.width = `${this.zoom * 100}%`;
-      this.previewImage.style.maxHeight = this.zoom === 1 ? '420px' : 'none';
-      this.previewImage.style.maxWidth = 'none';
+      this.previewImage.setCssProps({ '--vg-preview-width': `${this.zoom * 100}%` });
+      this.previewImage.classList.toggle('vg-image-zoomed', this.zoom !== 1);
     }
   }
   private navigate(direction: number): void {

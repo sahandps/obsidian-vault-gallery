@@ -52,7 +52,7 @@ test('moves and deletes folder metadata without touching similarly named folders
 test('rename validates portable filenames and preserves directory and original extension', () => {
   assert.equal(renamedPath(file('Art/old.JPG'), ' New name '), 'Art/New name.JPG');
   assert.equal(renamedPath(file('old.png'), 'New'), 'New.png');
-  for (const invalid of ['', '..', '../escape', 'sub/name', 'a\\b', 'a:b', 'nul', 'COM1', 'CON.jpg', 'trailing.', 'a'.repeat(260)]) {
+  for (const invalid of ['', '..', '../escape', 'sub/name', 'a\\b', 'a:b', 'nul', 'COM1', 'CON.jpg', 'trailing.', 'a' + String.fromCharCode(0) + 'b', 'a' + String.fromCharCode(31), 'a' + String.fromCharCode(127), 'a'.repeat(260)]) {
     assert.throws(() => renamedPath(file('old.png'), invalid));
   }
 });

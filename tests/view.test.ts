@@ -14,6 +14,7 @@ function file(path: string) {
 async function setup(files = [file('Art/photo.jpg'), file('video.mp4'), file('clip.gif'), file('music.mp3'), file('book.pdf')]) {
   const dom = new JSDOM('<div id="gallery"></div>');
   const doc = dom.window.document;
+  globalThis.window = dom.window as unknown as Window & typeof globalThis;
   dom.window.HTMLMediaElement.prototype.pause = () => {};
   dom.window.HTMLMediaElement.prototype.load = () => {};
   const listeners = new Map<string, (...args: any[]) => void>();
