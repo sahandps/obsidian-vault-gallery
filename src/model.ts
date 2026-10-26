@@ -11,6 +11,8 @@ export interface MediaMetadata { tags: string[]; description: string }
 export interface GalleryData {
   version: 1;
   thumbnailSize: number;
+  importFolder: string;
+  sidebarCollapsed: boolean;
   metadata: Record<string, MediaMetadata>;
 }
 export interface Filters {
@@ -36,11 +38,15 @@ export function getMetadata(data: GalleryData, path: string): MediaMetadata {
     ? data.metadata[path] : { tags: [], description: '' };
 }
 export function sanitizeData(raw: unknown): GalleryData {
-  const data: GalleryData = { version: 1, thumbnailSize: 220, metadata: Object.create(null) as Record<string, MediaMetadata> };
+  const data: GalleryData = { version: 1, thumbnailSize: 220, importFolder: 'Media', sidebarCollapsed: false, metadata: Object.create(null) as Record<string, MediaMetadata> };
   if (!raw || typeof raw !== 'object') return data;
   const input = raw as Partial<GalleryData>;
   if (typeof input.thumbnailSize === 'number' && Number.isFinite(input.thumbnailSize)) {
     data.thumbnailSize = Math.min(360, Math.max(140, input.thumbnailSize));
+  }
+  if (typeof input.sidebarCollapsed === 'boolean') data.sidebarCollapsed = input.sidebarCollapsed;
+  if (typeof input.importFolder === 'string') {
+    try { data.importFolder = normalizeImportFolder(input.importFolder); } catch { /* Keep the safe default for older or malformed settings. */ }
   }
   if (input.metadata && typeof input.metadata === 'object') {
     for (const [path, value] of Object.entries(input.metadata)) {
@@ -104,4 +110,28 @@ export function renamedPath(file: Pick<MediaFile, 'path' | 'name' | 'extension'>
   if (new TextEncoder().encode(filename).length > 255) throw new Error('This file name is too long.');
   const slash = file.path.lastIndexOf('/');
   return `${slash < 0 ? '' : file.path.slice(0, slash + 1)}${filename}`;
+}
+
+/** Store only paths relative to this vault; an empty path means its root. */
+export function normalizeImportFolder(value: string): string {
+  const folder = value.trim().replace(/\\/g, '/');
+  if (!folder) return '';
+  if (folder.startsWith('/') || /^[a-z]:/i.test(folder)) throw new Error('Choose a folder inside this vault.');
+  const parts = folder.split('/').filter(Boolean);
+  for (const part of parts) {
+    if (part === '.' || part === '..' || part.startsWith('.')) throw new Error('Use a visible folder inside this vault.');
+    renamedPath({ path: 'file.bin', name: 'file.bin', extension: 'bin' }, part);
+  }
+  return parts.join('/');
+}
+export function mediaAccept(): string {
+  return [...new Set(Object.values(extensions).flatMap(values => [...values]))].map(ext => `.${ext}`).join(',');
+}
+export function importPath(folder: string, name: string, suffix = 0): string {
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0 || !mediaKind(name.slice(dot + 1))) throw new Error('Choose a supported media file.');
+  const stem = name.slice(0, dot);
+  const extension = name.slice(dot + 1);
+  const filename = renamedPath({ path: name, name, extension }, suffix ? `${stem} (${suffix})` : stem);
+  return folder ? `${folder}/${filename}` : filename;
 }

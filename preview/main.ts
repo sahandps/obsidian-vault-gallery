@@ -1,7 +1,7 @@
 import './theme.css';
 import '../styles.css';
 import MediaHubPlugin from '../src/main';
-import { Notice } from './obsidian';
+import { TFolder } from './obsidian';
 
 interface PreviewFile {
   path: string; name: string; extension: string; parent: { path: string };
@@ -28,11 +28,27 @@ addFile('Documents/Gallery notes.pdf', '/assets/notes.pdf', 720, 9);
 const leaf: any = { contentEl: document.getElementById('gallery') };
 const plugin: any = new MediaHubPlugin();
 const listeners = new Map<string, (...args: any[]) => void>();
+const folders = new Map<string, TFolder>();
+for (const file of files) {
+  const parts = file.path.split('/'); parts.pop();
+  for (let i = 1; i <= parts.length; i++) { const path = parts.slice(0, i).join('/'); folders.set(path, new TFolder(path)); }
+}
 const app: any = {
+  doc: document,
   vault: {
     getFiles: () => files,
     getResourcePath: (file: PreviewFile) => file.url,
-    getAbstractFileByPath: (path: string) => files.find(file => file.path === path) || null,
+    getAbstractFileByPath: (path: string) => files.find(file => file.path === path) || folders.get(path) || null,
+    getAllLoadedFiles: () => [...files, ...folders.values()],
+    createFolder: async (path: string) => { const folder = new TFolder(path); folders.set(path, folder); return folder; },
+    createBinary: async (path: string, bytes: ArrayBuffer) => {
+      if (files.some(file => file.path === path)) throw new Error('File already exists.');
+      const extension = path.split('.').pop()!.toLowerCase();
+      const mime: Record<string, string> = { svg: 'image/svg+xml', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', wav: 'audio/wav', pdf: 'application/pdf' };
+      const blob = new Blob([bytes], { type: mime[extension] || 'application/octet-stream' });
+      const file = addFile(path, URL.createObjectURL(blob), bytes.byteLength);
+      listeners.get('create')?.(file); return file;
+    },
     on: (name: string, callback: (...args: any[]) => void) => { listeners.set(name, callback); return {}; },
   },
   fileManager: {
@@ -73,19 +89,6 @@ function setTheme(theme: string) {
 setTheme(localStorage.getItem('vault-gallery-preview-theme') || 'light');
 themeToggle.addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
 document.getElementById('reset-demo')!.addEventListener('click', () => { localStorage.removeItem('vault-gallery-preview'); location.reload(); });
-const picker = document.getElementById('file-picker') as HTMLInputElement;
-document.getElementById('add-media')!.addEventListener('click', () => picker.click());
-picker.addEventListener('change', () => {
-  for (const file of Array.from(picker.files || [])) {
-    let path = `Your files/${file.name}`;
-    let suffix = 2;
-    while (files.some(item => item.path === path)) path = `Your files/${suffix++}-${file.name}`;
-    addFile(path, URL.createObjectURL(file), file.size);
-  }
-  view.refresh(); picker.value = '';
-  new Notice('Local media added for this session. Files stay on your computer.');
-});
-
 // Generate a real, small WebM locally, with no downloads or remote media requests.
 async function createSampleVideo() {
   if (!('MediaRecorder' in window) || !HTMLCanvasElement.prototype.captureStream) return;

@@ -1,11 +1,13 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { ItemView, Notice, Plugin, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
+import { ItemView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, setIcon } from 'obsidian';
 import {
-  filterMedia, formatSize, getMetadata, mediaKind, moveMetadata, parseTags,
+  filterMedia, formatSize, getMetadata, importPath, mediaAccept, mediaKind, normalizeImportFolder, moveMetadata, parseTags,
   removeMetadata, renamedPath, sanitizeData, type Filters, type GalleryData, type MediaKind, type SortOrder,
 } from './model';
+
+import { GallerySettingsModal, GallerySettingsTab } from './settings';
 
 const VIEW_TYPE = 'vault-gallery';
 const PAGE_SIZE = 80;
@@ -52,6 +54,7 @@ export default class MediaHubPlugin extends Plugin {
       // Do not overwrite an unreadable metadata file with defaults.
       return;
     }
+    this.addSettingTab(new GallerySettingsTab(this.app, this));
     this.registerView(VIEW_TYPE, leaf => new GalleryView(leaf, this));
     this.addRibbonIcon('images', 'Open Media Hub', () => { void this.activate(); });
     this.addCommand({ id: 'open-gallery', name: 'Open gallery', callback: () => { void this.activate(); } });
@@ -59,6 +62,9 @@ export default class MediaHubPlugin extends Plugin {
     this.registerEvent(this.app.vault.on('modify', () => this.scheduleRefresh()));
     this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
       moveMetadata(this.data, oldPath, file.path);
+      if (file instanceof TFolder && (this.data.importFolder === oldPath || this.data.importFolder.startsWith(`${oldPath}/`))) {
+        this.data.importFolder = file.path + this.data.importFolder.slice(oldPath.length);
+      }
       for (const view of this.views()) view.onPathMoved(oldPath, file.path);
       void this.persist().catch(error => this.reportSaveError(error));
       this.scheduleRefresh();
@@ -92,6 +98,51 @@ export default class MediaHubPlugin extends Plugin {
     if (this.refreshTimer) window.clearTimeout(this.refreshTimer);
     this.refreshTimer = window.setTimeout(() => this.refreshViews(), 180);
   }
+  applyViewSettings(): void { for (const view of this.views()) view.applySettings(); }
+  async importMedia(files: readonly File[], progress: (message: string) => void): Promise<{ paths: string[]; failed: string[] }> {
+    const folder = normalizeImportFolder(this.data.importFolder);
+    const paths: string[] = [];
+    const failed: string[] = [];
+    // Make parent folders lazily; never overwrite a file or race another writer.
+    const ensureFolder = async () => {
+      let path = '';
+      for (const part of folder.split('/').filter(Boolean)) {
+        path = path ? `${path}/${part}` : part;
+        const existing = this.app.vault.getAbstractFileByPath(path);
+        if (existing && !(existing instanceof TFolder)) throw new Error(`A file blocks the folder: ${path}`);
+        if (!existing) {
+          try { await this.app.vault.createFolder(path); }
+          catch (error) { if (!(this.app.vault.getAbstractFileByPath(path) instanceof TFolder)) throw error; }
+        }
+      }
+    };
+    for (const [index, file] of files.entries()) {
+      progress(`Importing ${index + 1} of ${files.length}…`);
+      try {
+        // Validate the file before creating any folders or reading its bytes.
+        importPath(folder, file.name);
+        await ensureFolder();
+        const bytes = await file.arrayBuffer();
+        let saved = false;
+        for (let suffix = 0; suffix < 10000; suffix++) {
+          const path = importPath(folder, file.name, suffix);
+          if (this.app.vault.getAbstractFileByPath(path)) continue;
+          try {
+            await this.app.vault.createBinary(path, bytes);
+            paths.push(path); saved = true; break;
+          } catch (error) {
+            if (!this.app.vault.getAbstractFileByPath(path)) throw error;
+          }
+        }
+        if (!saved) throw new Error('Could not find an available file name.');
+      } catch (error) {
+        console.error('Media Hub import failed', file.name, error);
+        failed.push(file.name);
+      }
+    }
+    this.refreshViews();
+    return { paths, failed };
+  }
   refreshViews(): void { for (const view of this.views()) view.refresh(); }
   persist(): Promise<void> {
     // Snapshot every write and serialize them, so a slow older write cannot replace newer tags.
@@ -114,6 +165,8 @@ export class GalleryView extends ItemView {
   private visibleCount = PAGE_SIZE;
   private observer: IntersectionObserver | null = null;
   private sidebar!: HTMLElement;
+  private sidebarToggle!: HTMLButtonElement;
+  private thumbnailSlider!: HTMLInputElement;
   private grid!: HTMLElement;
   private preview!: HTMLElement;
   private counter!: HTMLElement;
@@ -137,14 +190,53 @@ export class GalleryView extends ItemView {
     root.tabIndex = -1;
     this.sidebar = el(root, 'aside', 'vg-sidebar');
     this.sidebar.setAttribute('aria-label', 'Media folders');
+    this.sidebar.id = `vg-folders-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const main = el(root, 'main', 'vg-main');
     const header = el(main, 'header', 'vg-header');
-    const heading = el(header, 'div');
+    this.sidebarToggle = button(header, 'Toggle folder pane', 'panel-left', () => {
+      const previous = this.plugin.data.sidebarCollapsed;
+      this.plugin.data.sidebarCollapsed = !previous;
+      this.plugin.applyViewSettings();
+      void this.plugin.persist().catch(error => {
+        this.plugin.data.sidebarCollapsed = previous;
+        this.plugin.applyViewSettings();
+        this.plugin.reportSaveError(error);
+      });
+    }, 'vg-icon-button vg-sidebar-toggle');
+    this.sidebarToggle.setAttribute('aria-controls', this.sidebar.id);
+    const heading = el(header, 'div', 'vg-header-heading');
     el(heading, 'div', 'vg-eyebrow', 'YOUR VAULT, IN VIEW');
     el(heading, 'h1', '', 'Media library');
     const actions = el(header, 'div', 'vg-header-actions');
     this.counter = el(actions, 'span', 'vg-counter');
     this.counter.setAttribute('role', 'status');
+    const picker = el(actions, 'input');
+    picker.type = 'file'; picker.multiple = true; picker.accept = mediaAccept(); picker.hidden = true;
+    picker.setAttribute('aria-label', 'Choose media files');
+    const importButton = button(actions, 'Add media', null, () => picker.click(), 'mod-cta vg-add-media');
+    const importStatus = el(actions, 'span', 'vg-import-status');
+    importStatus.setAttribute('role', 'status');
+    picker.addEventListener('change', () => {
+      const files = Array.from(picker.files || []);
+      picker.value = '';
+      if (!files.length) return;
+      importButton.disabled = true;
+      void this.plugin.importMedia(files, message => { importStatus.textContent = message; }).then(result => {
+        const message = `${result.paths.length} imported${result.failed.length ? `, ${result.failed.length} failed` : ''}.`;
+        importStatus.textContent = message;
+        if (result.paths.length) {
+          this.filters.query = ''; this.filters.kind = 'all'; this.filters.tag = '';
+          this.filters.folder = result.paths[0].includes('/') ? result.paths[0].slice(0, result.paths[0].lastIndexOf('/')) : '';
+          this.search.value = ''; this.refresh();
+          this.select(result.paths[0]);
+        }
+        new Notice(result.failed.length ? `${message} Could not import: ${result.failed.join(', ')}` : message);
+      }).catch(error => {
+        importStatus.textContent = 'Import failed.';
+        console.error(error); new Notice('Could not import media. Check the destination folder.');
+      }).finally(() => { importButton.disabled = false; });
+    });
+    button(actions, 'Gallery settings', 'settings', () => new GallerySettingsModal(this.app, this.plugin).open(), 'vg-icon-button');
     button(actions, 'Refresh library', 'refresh-cw', () => this.refresh(), 'vg-icon-button');
     const tabBar = el(main, 'nav', 'vg-tabs');
     tabBar.setAttribute('aria-label', 'Media types');
@@ -188,6 +280,7 @@ export class GalleryView extends ItemView {
     const sizing = el(toolbar, 'label', 'vg-sizing');
     setIcon(el(sizing, 'span', 'vg-icon'), 'grid-2x2');
     const slider = el(sizing, 'input');
+    this.thumbnailSlider = slider;
     slider.type = 'range'; slider.min = '140'; slider.max = '360'; slider.step = '10';
     slider.value = String(this.plugin.data.thumbnailSize);
     slider.setAttribute('aria-label', 'Thumbnail size');
@@ -212,7 +305,7 @@ export class GalleryView extends ItemView {
     this.preview.setAttribute('aria-label', 'Selected media');
     this.grid = el(scroll, 'div', 'vg-grid');
     this.grid.setAttribute('aria-label', 'Media files');
-    this.setThumbnailSize();
+    this.applySettings();
     this.registerDomEvent(root, 'keydown', event => {
       const target = event.target as HTMLElement;
       if (target.matches('input, textarea, select, [contenteditable="true"], video, audio')) return;
@@ -246,6 +339,15 @@ export class GalleryView extends ItemView {
     this.renderTagOptions();
     this.renderFolders();
     this.applyFilters();
+  }
+
+  applySettings(): void {
+    if (!this.sidebar) return;
+    this.sidebar.hidden = this.plugin.data.sidebarCollapsed;
+    this.sidebarToggle.setAttribute('aria-expanded', String(!this.plugin.data.sidebarCollapsed));
+    this.sidebarToggle.title = this.plugin.data.sidebarCollapsed ? 'Show folder pane' : 'Hide folder pane';
+    if (this.thumbnailSlider) this.thumbnailSlider.value = String(this.plugin.data.thumbnailSize);
+    this.setThumbnailSize();
   }
 
   private setThumbnailSize(): void {

@@ -10,6 +10,10 @@ Select any item for a larger preview and file details. Zoom into images, play vi
 
 Screenshots use sample media in the browser preview. The plugin follows your Obsidian theme.
 
+![Import destination and layout settings](docs/images/settings.jpg)
+
+Choose a default folder for added media from the gallery's gear button or **Settings → Media Hub**. Pick an existing vault folder, enter a new folder path, or leave the path empty to use the vault root. The folder pane can be collapsed to give your media more room.
+
 ## Manual installation
 
 Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/sahandps/obsidian-vault-gallery/releases/latest), place them in `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable **Media Hub** under Community plugins.
@@ -25,6 +29,10 @@ Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](
 Use a test vault for your first run. This plugin has automated tests but has not yet been verified inside a running Obsidian app.
 
 ## Features
+
+- **Add media:** select one or several files to copy into your vault. The default import folder is `Media`; change it in **Settings → Media Hub** or with the gallery gear button. Nested folders are created on the first import. Existing files are preserved, and duplicate names get numbered suffixes such as `photo (1).png`. Originals remain where they are.
+- **Collapsible folder pane:** use the panel button beside the title. The choice is saved across sessions.
+- **Gallery settings:** choose an existing folder or enter a new vault-relative path, set thumbnail size, and control pane visibility. On Obsidian 1.13+, the settings are also searchable.
 
 - Discovers media files already in the vault and updates after files are added, modified, renamed, moved, or deleted.
 - Separate All media, Images, GIFs, Videos, Audio, and PDFs tabs.
@@ -71,7 +79,7 @@ Before publishing: test in Obsidian with light/dark themes, a large vault, unava
 
 Run `npm run preview`, then open **http://127.0.0.1:4173/**. This runs the production gallery view with an Obsidian adapter and a sample vault, served only on your computer. Try the folder/type/tag filters, image zoom, animated GIF, audio/video playback, and editable details. Sample illustrations, animation, audio, PDF, and video are generated locally; no external media requests are needed.
 
-**Add local media** lets you preview your own files for the current session; those files stay in the browser and are not uploaded. Tags and thumbnail size persist in browser local storage separately from Obsidian's plugin data. **Reset demo** clears the preview's saved details and reloads the sample vault. **Open in Obsidian** opens the original media in a browser tab in this preview. Renaming in the preview changes only its simulated vault, not the files on your disk, and lasts until you reload. Real vault discovery and file-change events require Obsidian.
+**Add media** lets you preview your own files in a simulated import folder for the current session; those files stay in the browser and are not uploaded. Tags and thumbnail size persist in browser local storage separately from Obsidian's plugin data. **Reset demo** clears the preview's saved details and reloads the sample vault. **Open in Obsidian** opens the original media in a browser tab in this preview. Renaming in the preview changes only its simulated vault, not the files on your disk, and lasts until you reload. Real vault discovery and file-change events require Obsidian.
 
 
 ## Releases and license
@@ -84,6 +92,14 @@ Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public Lice
 If Media Hub is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
 
 ## Updates
+
+### 0.2.0
+
+- Add multi-file media import with configurable destination folders, progress, duplicate-name handling, and failure reporting.
+- Add a collapsible folder pane with persistent visibility.
+- Add Media Hub settings for the import folder, thumbnail size, and pane visibility, available in Obsidian settings and from the gallery gear button.
+- Migrate saved settings while preserving existing tags and descriptions.
+- Expand automated coverage for imports, destination validation, settings, and pane collapse.
 
 ### 0.1.3
 

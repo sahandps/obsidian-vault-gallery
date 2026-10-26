@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filterMedia, getMetadata, mediaKind, moveMetadata, parseTags, removeMetadata, renamedPath, sanitizeData, type Filters, type MediaFile } from '../src/model';
+import { filterMedia, getMetadata, mediaKind, moveMetadata, normalizeImportFolder, importPath, parseTags, removeMetadata, renamedPath, sanitizeData, type Filters, type MediaFile } from '../src/model';
 const file = (path: string, size = 100, mtime = 10): MediaFile => ({ path, name: path.split('/').pop()!, extension: path.split('.').pop()!, stat: { ctime: 1, mtime, size } });
 const filters: Filters = { query: '', kind: 'all', folder: null, tag: '', sort: 'newest' };
 test('discovers media without treating arbitrary files as media', () => {
@@ -55,4 +55,19 @@ test('rename validates portable filenames and preserves directory and original e
   for (const invalid of ['', '..', '../escape', 'sub/name', 'a\\b', 'a:b', 'nul', 'COM1', 'CON.jpg', 'trailing.', 'a' + String.fromCharCode(0) + 'b', 'a' + String.fromCharCode(31), 'a' + String.fromCharCode(127), 'a'.repeat(260)]) {
     assert.throws(() => renamedPath(file('old.png'), invalid));
   }
+});
+
+
+test('import settings migrate old data without losing tags and reject paths outside the vault', () => {
+  const data = sanitizeData({ thumbnailSize: 200, metadata: { 'photo.jpg': { tags: ['art'], description: 'Keep' } } });
+  assert.equal(data.importFolder, 'Media'); assert.equal(data.sidebarCollapsed, false);
+  assert.deepEqual(data.metadata['photo.jpg'].tags, ['art']);
+  assert.equal(sanitizeData({ importFolder: '', sidebarCollapsed: true }).importFolder, '');
+  assert.equal(sanitizeData({ importFolder: '../escape' }).importFolder, 'Media');
+  assert.equal(normalizeImportFolder(' Assets//Photos/ '), 'Assets/Photos');
+  for (const path of ['/outside', '../outside', 'Assets/../x', '.obsidian', 'C:/outside', 'a/NUL']) assert.throws(() => normalizeImportFolder(path));
+  assert.equal(importPath('Media', 'a.PNG', 2), 'Media/a (2).PNG');
+  assert.equal(importPath('', 'a.png'), 'a.png');
+  assert.throws(() => importPath('Media', '../a.png'));
+  assert.throws(() => importPath('Media', 'note.md'));
 });

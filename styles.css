@@ -116,3 +116,19 @@
 .vg-extension { color: var(--text-faint); font-size: 11px; flex-shrink: 0; }
 .vg-rename-status:empty { display: none; }
 .vg-root .vg-rename { width: 100%; margin-top: 8px; font-size: 10px; background: var(--background-secondary); border: 1px solid var(--vg-border); }
+
+.vg-header-heading { flex: 1; min-width: 0; }
+.vg-root .vg-add-media { display: inline-flex; align-items: center; white-space: nowrap; font-size: 12px; padding: 8px 13px; height: 34px; border-radius: 7px; }
+.vg-import-status { font-size: 10px; color: var(--vg-muted); max-width: 120px; }
+.vg-import-status:empty { display: none; }
+.vg-setting-field { display: flex; flex-direction: column; gap: 9px; margin: 18px 0 8px; font-size: 13px; }
+.vg-settings input[type="text"], .vg-settings select { width: 100%; padding: 9px; border: 1px solid var(--background-modifier-border); border-radius: 6px; }
+.vg-setting-hint { color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+.vg-setting-check { display: flex; gap: 9px; align-items: center; margin: 22px 0; font-size: 13px; }
+.vg-settings input[type="range"] { width: 100%; }
+@container (max-width: 700px) {
+  .vg-header { flex-wrap: wrap; padding: 20px 16px; gap: 10px; }
+  .vg-header-actions { width: 100%; justify-content: flex-end; gap: 8px; }
+  .vg-header h1 { font-size: 23px; }
+}
+.vg-settings-row { display: block; }

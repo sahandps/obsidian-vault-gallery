@@ -43,3 +43,7 @@ input[type="range"] { accent-color: var(--interactive-accent); }
   .preview-vault { width: 145px; font-size: 10px; padding: 0 12px; }
   .preview-appbar-note { display: none; }
 }
+.preview-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; background: #0007; }
+.preview-modal { background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 14px; padding: 24px; width: 480px; max-height: 90dvh; overflow: auto; box-shadow: 0 20px 100px #0004; }
+.preview-modal h2 { font-size: 18px; }
+.preview-modal-close { float: right; font-size: 11px; }

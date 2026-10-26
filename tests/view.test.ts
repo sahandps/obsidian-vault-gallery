@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import { resolve } from 'node:path';
 
-const bundle = await build({ entryPoints: ['src/main.ts'], bundle: true, platform: 'node', format: 'cjs', write: false, alias: { obsidian: resolve('tests/obsidian-mock.ts') } });
+const bundle = await build({ stdin: { contents: "export {default} from './src/main'; export {TFolder as MockFolder} from './tests/obsidian-mock';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', write: false, alias: { obsidian: resolve('tests/obsidian-mock.ts') } });
 const module = { exports: {} as any };
 new Function('module', 'exports', bundle.outputFiles[0].text)(module, module.exports);
 const GalleryPlugin = module.exports.default;
@@ -21,9 +21,17 @@ async function setup(files = [file('Art/photo.jpg'), file('video.mp4'), file('cl
   const leaf: any = { contentEl: doc.getElementById('gallery') };
   const opened: any[] = [];
   const plugin = new GalleryPlugin();
-  const app = { vault: {
+  const folders = new Map<string, any>();
+  const created: string[] = [];
+  const app = { doc, vault: {
     getFiles: () => files,
-    getAbstractFileByPath: (path: string) => files.find(item => item.path === path) || null,
+    getAbstractFileByPath: (path: string) => files.find(item => item.path === path) || folders.get(path) || null,
+    getAllLoadedFiles: () => [...files, ...folders.values()],
+    createFolder: async (path: string) => { const folder = new module.exports.MockFolder(path); folders.set(path, folder); return folder; },
+    createBinary: async (path: string, _bytes: ArrayBuffer) => {
+      if (files.some(item => item.path === path)) throw new Error('File exists');
+      const createdFile = file(path); files.push(createdFile); created.push(path); return createdFile;
+    },
     getResourcePath: () => 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
     on: (name: string, callback: (...args: any[]) => void) => { listeners.set(name, callback); return callback; },
   }, fileManager: {
@@ -41,7 +49,7 @@ async function setup(files = [file('Art/photo.jpg'), file('video.mp4'), file('cl
     const node = doc.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
     assert.ok(node, `Button ${label} exists`); node.click();
   };
-  return { dom, doc, plugin, view, click, listeners, files, opened };
+  return { dom, doc, plugin, view, click, listeners, files, opened, created, folders };
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -163,4 +171,67 @@ test('rename refuses collisions and recovers from filesystem errors without losi
   assert.equal(name.value, 'new');
   assert.equal(files[0].path, 'Art/photo.jpg');
   await view.onClose();
+});
+
+
+const upload = (name: string): File => new File([new Uint8Array([1, 2, 3])], name, { type: 'image/png' });
+
+test('media imports create nested folders, keep duplicate files, and skip unsupported uploads', async () => {
+  const { plugin, folders, view } = await setup();
+  plugin.data.importFolder = 'Assets/Photos';
+  const originalError = console.error; console.error = () => {};
+  let result;
+  try { result = await plugin.importMedia([upload('photo.png'), upload('photo.png'), upload('note.md')], () => {}); }
+  finally { console.error = originalError; }
+  assert.deepEqual(result.paths, ['Assets/Photos/photo.png', 'Assets/Photos/photo (1).png']);
+  assert.deepEqual(result.failed, ['note.md']);
+  assert.ok(folders.has('Assets')); assert.ok(folders.has('Assets/Photos'));
+  plugin.onunload(); await view.onClose();
+});
+
+test('imports recover from a duplicate-name race and report write errors without overwriting files', async () => {
+  const { plugin, files, view } = await setup(); plugin.data.importFolder = '';
+  let first = true;
+  plugin.app.vault.createBinary = async (path: string) => {
+    if (first) { first = false; files.push(file(path)); throw new Error('File exists'); }
+    files.push(file(path)); return files[files.length - 1];
+  };
+  const result = await plugin.importMedia([upload('photo.png')], () => {});
+  assert.deepEqual(result.paths, ['photo (1).png']);
+  assert.ok(files.some((f: any) => f.path === 'photo.png'));
+  plugin.app.vault.createBinary = async () => { throw new Error('Disk full'); };
+  const originalError = console.error; console.error = () => {};
+  try { assert.deepEqual((await plugin.importMedia([upload('another.png')], () => {})).failed, ['another.png']); }
+  finally { console.error = originalError; }
+  await view.onClose();
+});
+
+test('folder pane collapse persists and settings save the destination and layout', async () => {
+  const { doc, dom, plugin, view, click } = await setup();
+  click('Toggle folder pane'); await tick();
+  assert.equal(doc.querySelector<HTMLElement>('.vg-sidebar')!.hidden, true);
+  assert.equal(plugin.stored.sidebarCollapsed, true);
+  assert.equal(doc.querySelector('[aria-label="Toggle folder pane"]')!.getAttribute('aria-expanded'), 'false');
+  click('Gallery settings');
+  const destination = doc.querySelector<HTMLInputElement>('[aria-label="Default media folder"]')!;
+  assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="Default thumbnail size"]')!.value, String(plugin.data.thumbnailSize));
+  destination.value = '../outside';
+  const save = [...doc.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Save settings')!;
+  save.click(); await tick();
+  assert.equal(plugin.data.importFolder, 'Media');
+  destination.value = 'Imported/Images';
+  const collapsed = doc.querySelector<HTMLInputElement>('.vg-setting-check input')!; collapsed.checked = false;
+  const size = doc.querySelector<HTMLInputElement>('[aria-label="Default thumbnail size"]')!; size.value = '300';
+  save.click(); await tick();
+  assert.equal(plugin.stored.importFolder, 'Imported/Images');
+  assert.equal(plugin.stored.thumbnailSize, 300);
+  assert.equal(doc.querySelector<HTMLElement>('.vg-sidebar')!.hidden, false);
+  doc.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click();
+  const picker = doc.querySelector<HTMLInputElement>('[aria-label="Choose media files"]')!;
+  Object.defineProperty(picker, 'files', { value: [upload('added.png')] });
+  picker.dispatchEvent(new dom.window.Event('change')); await tick();
+  assert.ok(doc.querySelector('[aria-label="Preview added.png"]'));
+  assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value, 'added');
+  assert.equal(doc.querySelector<HTMLButtonElement>('[aria-label="Add media"]')!.disabled, false);
+  plugin.onunload(); await view.onClose();
 });
