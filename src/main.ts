@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Sahand (sahandps)
+// SPDX-License-Identifier: GPL-3.0-only
+
 import { ItemView, Notice, Plugin, TFile, WorkspaceLeaf, setIcon } from 'obsidian';
 import {
   filterMedia, formatSize, getMetadata, mediaKind, moveMetadata, parseTags,

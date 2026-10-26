@@ -15,3 +15,5 @@ Vault Gallery brings images, GIFs, videos, audio, and PDFs into one browsable me
 For manual installation, download `main.js`, `manifest.json`, and `styles.css` below into `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable the plugin.
 
 This is the initial release. Automated checks and the browser preview pass; live Obsidian and mobile testing are still needed. Media playback depends on the device's codecs. PDFs open in Obsidian's reader. Tags are gallery metadata, not native Obsidian note tags.
+
+Licensed under GNU GPL v3.0 (`GPL-3.0-only`). Full corresponding source is available in the source archives for this release.

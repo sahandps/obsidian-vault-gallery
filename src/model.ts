@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Sahand (sahandps)
+// SPDX-License-Identifier: GPL-3.0-only
+
 export type MediaKind = 'image' | 'gif' | 'video' | 'audio' | 'pdf';
 export type SortOrder = 'newest' | 'oldest' | 'name' | 'largest';
 export interface MediaFile {
