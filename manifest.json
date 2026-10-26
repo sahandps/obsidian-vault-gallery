@@ -1,7 +1,7 @@
 {
   "id": "vault-gallery",
-  "name": "Media Gallery",
-  "version": "0.1.2",
+  "name": "Media Hub",
+  "version": "0.1.3",
   "minAppVersion": "1.7.2",
   "description": "Browse vault images, GIFs, videos, audio, and PDFs with folders, filters, and editable tags.",
   "author": "Sahand",

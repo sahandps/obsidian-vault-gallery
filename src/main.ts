@@ -39,7 +39,7 @@ function stopMedia(root: HTMLElement): void {
   });
 }
 
-export default class MediaGalleryPlugin extends Plugin {
+export default class MediaHubPlugin extends Plugin {
   data: GalleryData = sanitizeData(null);
   private saveQueue: Promise<void> = Promise.resolve();
   private refreshTimer: number | undefined;
@@ -47,13 +47,13 @@ export default class MediaGalleryPlugin extends Plugin {
   async onload(): Promise<void> {
     try { this.data = sanitizeData(await this.loadData()); }
     catch (error) {
-      console.error('Media Gallery could not load its data', error);
-      new Notice('Media Gallery could not load saved tags. Reload the plugin before editing tags.');
+      console.error('Media Hub could not load its data', error);
+      new Notice('Media Hub could not load saved tags. Reload the plugin before editing tags.');
       // Do not overwrite an unreadable metadata file with defaults.
       return;
     }
     this.registerView(VIEW_TYPE, leaf => new GalleryView(leaf, this));
-    this.addRibbonIcon('images', 'Open Media Gallery', () => { void this.activate(); });
+    this.addRibbonIcon('images', 'Open Media Hub', () => { void this.activate(); });
     this.addCommand({ id: 'open-gallery', name: 'Open gallery', callback: () => { void this.activate(); } });
     this.registerEvent(this.app.vault.on('create', () => this.scheduleRefresh()));
     this.registerEvent(this.app.vault.on('modify', () => this.scheduleRefresh()));
@@ -85,7 +85,7 @@ export default class MediaGalleryPlugin extends Plugin {
       await this.app.workspace.revealLeaf(leaf);
     } catch (error) {
       console.error(error);
-      new Notice('Could not open Media Gallery. See the developer console for details.');
+      new Notice('Could not open Media Hub. See the developer console for details.');
     }
   }
   private scheduleRefresh(): void {
@@ -101,7 +101,7 @@ export default class MediaGalleryPlugin extends Plugin {
     return write;
   }
   reportSaveError(error: unknown): void {
-    console.error('Media Gallery save failed', error);
+    console.error('Media Hub save failed', error);
     new Notice('Could not save gallery data. Check that your vault is writable.');
   }
 }
@@ -125,9 +125,9 @@ export class GalleryView extends ItemView {
   private renaming = false;
   private previewImage: HTMLImageElement | null = null;
 
-  constructor(leaf: WorkspaceLeaf, private plugin: MediaGalleryPlugin) { super(leaf); }
+  constructor(leaf: WorkspaceLeaf, private plugin: MediaHubPlugin) { super(leaf); }
   getViewType(): string { return VIEW_TYPE; }
-  getDisplayText(): string { return 'Media Gallery'; }
+  getDisplayText(): string { return 'Media Hub'; }
   getIcon(): string { return 'images'; }
 
   async onOpen(): Promise<void> {
@@ -265,7 +265,7 @@ export class GalleryView extends ItemView {
     this.sidebar.replaceChildren();
     const brand = el(this.sidebar, 'div', 'vg-brand');
     setIcon(el(brand, 'span', 'vg-brand-icon'), 'images');
-    el(brand, 'strong', '', 'Media Gallery');
+    el(brand, 'strong', '', 'Media Hub');
     el(this.sidebar, 'div', 'vg-sidebar-label', 'LIBRARY');
     const folderButton = (label: string, path: string | null, count: number, depth: number) => {
       const row = button(this.sidebar, label, null, () => {
@@ -521,7 +521,7 @@ export class GalleryView extends ItemView {
         }
         new Notice('File renamed.');
       } catch (error) {
-        console.error('Media Gallery rename failed', error);
+        console.error('Media Hub rename failed', error);
         renameStatus.textContent = error instanceof Error ? error.message : 'Could not rename this file.';
         rename.disabled = false; save.disabled = false; nameInput.disabled = false;
         tags.disabled = false; description.disabled = false;

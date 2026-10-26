@@ -1,8 +1,8 @@
-# Media Gallery
+# Media Hub
 
 ![Media gallery with folders and filters](docs/images/gallery.jpg)
 
-Media Gallery brings your vault's images, GIFs, videos, audio, and PDFs into one searchable media library. Browse by folder, filter by type or tag, and adjust the grid to see your media the way you prefer.
+Media Hub brings your vault's images, GIFs, videos, audio, and PDFs into one searchable media library. Browse by folder, filter by type or tag, and adjust the grid to see your media the way you prefer.
 
 ![Expanded preview with editable filename, tags, and description](docs/images/details.jpg)
 
@@ -12,15 +12,15 @@ Screenshots use sample media in the browser preview. The plugin follows your Obs
 
 ## Manual installation
 
-Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/sahandps/obsidian-vault-gallery/releases/latest), place them in `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable **Media Gallery** under Community plugins.
+Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/sahandps/obsidian-vault-gallery/releases/latest), place them in `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable **Media Hub** under Community plugins.
 
 ## Build and install from source
 
 1. Run `npm ci` and `npm run package` in this project (Node.js 22 or newer).
 2. In your vault, create `.obsidian/plugins/vault-gallery/`.
 3. Copy `main.js`, `manifest.json`, and `styles.css` from `release/vault-gallery/` into that folder.
-4. Reload Obsidian. In **Settings → Community plugins**, enable **Media Gallery**. Community plugins must be enabled.
-5. Click the images icon in the left ribbon, or run **Media Gallery: Open gallery** in the command palette.
+4. Reload Obsidian. In **Settings → Community plugins**, enable **Media Hub**. Community plugins must be enabled.
+5. Click the images icon in the left ribbon, or run **Media Hub: Open gallery** in the command palette.
 
 Use a test vault for your first run. This plugin has automated tests but has not yet been verified inside a running Obsidian app.
 
@@ -81,9 +81,16 @@ Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public Lice
 
 ## Support
 
-If Media Gallery is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
+If Media Hub is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
 
 ## Updates
+
+### 0.1.3
+
+- Rename the plugin to Media Hub to resolve the Media Gallery directory name conflict.
+- Keep the internal plugin ID and existing data unchanged.
+- Refresh the gallery branding and documentation.
+
 
 ### 0.1.2
 

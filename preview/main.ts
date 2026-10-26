@@ -1,6 +1,6 @@
 import './theme.css';
 import '../styles.css';
-import MediaGalleryPlugin from '../src/main';
+import MediaHubPlugin from '../src/main';
 import { Notice } from './obsidian';
 
 interface PreviewFile {
@@ -26,7 +26,7 @@ addFile('Documents/Gallery notes.pdf', '/assets/notes.pdf', 720, 9);
 
 // The adapter uses the production GalleryView; only Obsidian's vault and storage are simulated.
 const leaf: any = { contentEl: document.getElementById('gallery') };
-const plugin: any = new MediaGalleryPlugin();
+const plugin: any = new MediaHubPlugin();
 const listeners = new Map<string, (...args: any[]) => void>();
 const app: any = {
   vault: {
