@@ -37,6 +37,7 @@ const app: any = {
   doc: document,
   vault: {
     getFiles: () => files,
+    readBinary: async (file: PreviewFile) => { const response = await fetch(file.url); if (!response.ok) throw new Error("Could not read sample media."); return response.arrayBuffer(); },
     getResourcePath: (file: PreviewFile) => file.url,
     getAbstractFileByPath: (path: string) => files.find(file => file.path === path) || folders.get(path) || null,
     getAllLoadedFiles: () => [...files, ...folders.values()],

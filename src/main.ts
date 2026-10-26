@@ -7,6 +7,7 @@ import {
   removeMetadata, renamedPath, sanitizeData, type Filters, type GalleryData, type MediaKind, type SortOrder,
 } from './model';
 
+import { EXPORT_LIMIT, exportPayload } from './export-media';
 import { TagEditor } from './tag-editor';
 import { GalleryActionModal } from './action-modal';
 import { GallerySettingsModal, GallerySettingsTab } from './settings';
@@ -664,6 +665,11 @@ export class GalleryView extends ItemView {
     const description = el(descriptionLabel, 'textarea');
     description.rows = 3; description.value = metadata.description; description.placeholder = 'Add a little context…';
     const save = button(inspector, 'Save details', null, () => {
+      // Save also commits an edited filename, so changes cannot be silently ignored.
+      if (nameInput.value.trim() !== file.name.slice(0, -(file.extension.length + 1))) {
+        void renameFile().then(success => { if (success) this.preview.querySelector<HTMLButtonElement>('.vg-save')?.click(); });
+        return;
+      }
       const old = getMetadata(this.plugin.data, file.path);
       this.plugin.data.metadata[file.path] = { tags: tags.getTags(), description: description.value.trim() };
       save.disabled = true; rename.disabled = true; tags.setDisabled(true); description.disabled = true; save.textContent = 'Saving…';
@@ -682,12 +688,12 @@ export class GalleryView extends ItemView {
       let newPath: string;
       try {
         newPath = renamedPath(file, nameInput.value);
-        if (newPath === file.path) { renameStatus.textContent = 'The name is unchanged.'; return; }
+        if (newPath === file.path) { renameStatus.textContent = 'The name is unchanged.'; return false; }
         if (this.app.vault.getAbstractFileByPath(newPath)) throw new Error('A file with this name already exists in this folder.');
       } catch (error) {
         renameStatus.textContent = error instanceof Error ? error.message : 'Invalid file name.';
         nameInput.focus();
-        return;
+        return false;
       }
       const draftTags = tags.getTags();
       const draftDescription = description.value;
@@ -706,16 +712,19 @@ export class GalleryView extends ItemView {
           if (newDescription) newDescription.value = draftDescription;
         }
         new Notice('File renamed.');
+        return true;
       } catch (error) {
         console.error('Media Hub rename failed', error);
         renameStatus.textContent = error instanceof Error ? error.message : 'Could not rename this file.';
         rename.disabled = false; save.disabled = false; nameInput.disabled = false;
         tags.setDisabled(false); description.disabled = false;
         rename.textContent = 'Rename file';
+        return false;
       } finally { this.renaming = false; }
     };
     markDirty = () => { save.textContent = 'Save details'; };
     description.addEventListener('input', markDirty);
+    button(inspector, 'Download', 'download', () => this.openDownloadDialog([file.path]), 'vg-open-file');
     button(inspector, 'Open in Obsidian', 'external-link', () => { void this.openFile(file); }, 'vg-open-file');
     this.preview.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }
@@ -755,6 +764,7 @@ export class GalleryView extends ItemView {
         }).catch(error => { remove.disabled = false; this.plugin.reportSaveError(error); });
       });
     }
+    button(this.selectionBar, 'Download', null, () => this.openDownloadDialog(paths));
     button(this.selectionBar, 'Delete files', null, () => this.openDeleteDialog(paths), 'vg-delete-button');
   }
 
@@ -832,6 +842,67 @@ export class GalleryView extends ItemView {
         });
       }, 'mod-cta');
       name.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); submit.click(); } });
+    }).open();
+  }
+
+  private openDownloadDialog(paths: readonly string[]): void {
+    new GalleryActionModal(this.app, `Download ${paths.length} ${paths.length === 1 ? 'file' : 'files'}`, (body) => {
+      el(body, 'p', 'vg-setting-hint', paths.length === 1 ? 'Save a copy on your device. The vault file is preserved.' : 'Save the selected files individually in their original formats. The vault files are preserved.');
+      const status = el(body, 'p', 'vg-setting-hint', 'Preparing download…'); status.setAttribute('role', 'status');
+      const actions = el(body, 'div', 'vg-modal-actions');
+      const download = button(actions, 'Save to device', null, () => {}, 'mod-cta'); download.disabled = true;
+      const owner = body.ownerDocument.defaultView;
+      if (!owner) return;
+      const prepare = async () => {
+        const files = this.app.vault.getFiles();
+        const selected = paths.map(path => {
+          const file = files.find(item => item.path === path);
+          if (!file) throw new Error('A selected file is no longer available. Close and select again.');
+          return { file, path };
+        });
+        if (selected.reduce((size, target) => size + target.file.stat.size, 0) > EXPORT_LIMIT) throw new Error('Select fewer files: exports are limited to 512 MB.');
+        const entries = [];
+        let size = 0;
+        for (const target of selected) {
+          if (target.file.path !== target.path) throw new Error('A selected file was renamed. Close and select again.');
+          const bytes = await this.app.vault.readBinary(target.file);
+          size += bytes.byteLength;
+          if (size > EXPORT_LIMIT) throw new Error('Select fewer files: exports are limited to 512 MB.');
+          entries.push({ path: target.path, bytes });
+        }
+        const payload = exportPayload(entries);
+        if (!body.isConnected) return;
+        const copies = payload;
+        const nav = owner.navigator;
+        const share = button(actions, 'Share / Save to Files', null, () => {
+          // Keep the native share call inside this fresh user gesture.
+          share.disabled = true;
+          void nav.share({ files: copies }).then(() => { status.textContent = 'Handed to your device’s share sheet.'; }).catch((error: unknown) => {
+            status.textContent = error instanceof Error && error.name === 'AbortError' ? 'Sharing cancelled. Your vault files are unchanged.' : 'Sharing is unavailable. Try Save to device instead.';
+          }).finally(() => { share.disabled = false; });
+        });
+        share.hidden = !(typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: copies }));
+        const saveCopy = (copy: File) => {
+          const url = URL.createObjectURL(copy);
+          const link = body.createEl('a', { text: copy.name });
+          link.href = url; link.download = copy.name; link.hidden = true;
+          link.click(); link.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+          status.textContent = 'Download requested. If your device blocks multiple downloads, use the individual save buttons.';
+        };
+        download.disabled = false;
+        download.addEventListener('click', () => { for (const copy of copies) saveCopy(copy); });
+        if (copies.length > 1) {
+          const list = el(body, 'div', 'vg-download-list');
+          for (const [index, copy] of copies.entries()) {
+            const row = el(list, 'div', 'vg-download-row');
+            el(row, 'span', '', entries[index].path);
+            button(row, `Save ${copy.name}`, 'download', () => saveCopy(copy));
+          }
+        }
+        status.textContent = share.hidden ? `${copies.length} ${copies.length === 1 ? 'file' : 'files'} ready. Save support depends on your device.` : `${copies.length} ${copies.length === 1 ? 'file' : 'files'} ready. Use the share sheet to choose Save to Files or another destination.`;
+      };
+      void prepare().catch((error: unknown) => { status.textContent = error instanceof Error ? error.message : 'Could not prepare download.'; });
     }).open();
   }
 

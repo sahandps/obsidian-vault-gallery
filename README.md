@@ -18,6 +18,10 @@ Screenshots use sample media in the browser preview. The plugin follows your Obs
 
 Choose a default folder for added media from the gallery's gear button or **Settings → Media Hub**. Pick an existing vault folder, enter a new folder path, or leave the path empty to use the vault root. The folder pane can be collapsed to give your media more room.
 
+![Download selected files in their original formats](docs/images/downloads.jpg)
+
+Save media copies to your device from the selection toolbar or expanded preview. Each file keeps its original format. Individual save buttons and supported native sharing give you control over where copies go.
+
 ## Manual installation
 
 Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/sahandps/obsidian-vault-gallery/releases/latest), place them in `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable **Media Hub** under Community plugins.
@@ -45,11 +49,12 @@ Use a test vault for your first run. This plugin has automated tests but has not
 - Tag filter and sorting by modified date, name, or file size.
 - Adjustable thumbnail sizes, saved across sessions.
 - Expanded image/GIF preview with zoom, and video/audio playback controls.
-- Editable filename in the details panel: change the name and click **Rename file**, or press Enter. The extension and folder stay the same. Duplicate and invalid names are rejected. Obsidian manages updates to linked notes according to your vault settings. Gallery tags and unsaved detail edits stay attached when you rename from this panel.
+- Editable filename in the details panel: change the name and click **Rename file**, press Enter, or use **Save details** to apply the name together with tags and description. The extension and folder stay the same. Duplicate and invalid names are rejected. Obsidian manages updates to linked notes according to your vault settings. Gallery tags and unsaved detail edits stay attached when you rename from this panel.
 - File path, format, size, file-system dates, image dimensions, or playback duration in the details panel.
 - **Tag chips:** type a tag and press Enter or comma; remove a chip with ×. Existing tags appear as suggestions, with mouse or arrow-key selection. Click **Save details** before switching files. Tags are normalized to lowercase and deduplicated.
 - **Multiple selection:** check media cards, Shift-click for a range, or use **Select all** for all matching files, including cards not yet loaded. Changing filters clears selections that are no longer visible. Bulk **Add tags** preserves existing tags and descriptions.
 - **Collections:** create a group with the + beside Collections, or select files and use **Add to collection** to choose an existing group or create one. Membership follows renames and folder moves observed while the plugin is running.
+- **Download:** save original files from the selection toolbar or preview. Multiple files remain separate, with individual save buttons if your device blocks bulk downloads. Where supported, **Share / Save to Files** opens the native share sheet. Available destinations and download support depend on the device; mobile behavior requires device testing. Files remain in the vault. Exports are prepared in memory and limited to 512 MB per selection.
 - **Deletion:** **Remove from collection** keeps files in the vault and other collections. **Delete files** confirms the selected count and exact file paths before using Obsidian’s trash handling. Files renamed or replaced after confirmation are skipped; failures are reported.
 - Previous/next buttons and left/right arrow navigation; Escape closes the preview when outside a form or player.
 - Opens the original file in a separate Obsidian tab. PDFs open in Obsidian's reader.
@@ -99,6 +104,13 @@ Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public Lice
 If Media Hub is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
 
 ## Updates
+
+### 0.3.1
+
+- Make **Save details** apply filename edits as well as tags and descriptions.
+- Add downloads for individual files and multiple selections in their original formats, without ZIP archives.
+- Add per-file save buttons and native file sharing where supported.
+- Validate exported bytes and cover rename/save failures with automated tests.
 
 ### 0.3.0
 

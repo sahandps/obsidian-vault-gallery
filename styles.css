@@ -160,3 +160,7 @@
 .vg-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .vg-delete-list { max-height: 220px; overflow: auto; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; padding-left: 20px; }
 .vg-tag-suggestions { max-height: 180px; overflow: auto; }
+.vg-download-list { max-height: 280px; overflow: auto; margin-top: 18px; }
+.vg-download-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 12px; border-bottom: 1px solid var(--background-modifier-border); }
+.vg-download-row span { overflow-wrap: anywhere; min-width: 0; }
+.vg-download-row button { flex-shrink: 0; }

@@ -1,21 +1,16 @@
-Media Hub 0.3.0 adds tag chips, multiple selection, and collections.
+Media Hub 0.3.1 fixes filename saving and adds original-file downloads.
 
-Requires Obsidian **1.7.2 or newer**. Licensed under **GNU GPL v3.0** (`GPL-3.0-only`). The plugin ID remains `vault-gallery`, preserving existing tags, descriptions, and settings.
+Editing **File name** and clicking **Save details** now applies the rename along with tags and description. **Rename file** and Enter remain available. Invalid names and collisions show an error without saving details to the wrong path.
 
-Type a tag and press **Enter** or **comma** to create a chip, choose an existing-tag suggestion, or remove a chip with **×**. Click **Save details** to save inspector edits.
+Use **Download** in the selection toolbar or file preview to save copies on your device. Multiple files stay separate in their original formats—no ZIP archive. Use individual save buttons if your device blocks bulk downloads. Where supported, **Share / Save to Files** opens the native share sheet. Actual save destinations depend on the device; mobile functionality still requires device testing. Exports are prepared in memory and limited to 512 MB per selection.
 
-Check media cards, **Shift-click** to select a range, or use **Select all** to select every matching file. The selection toolbar offers **Add tags**, **Add to collection**, and **Delete files**. Create named collections from the sidebar or while adding files; a file can belong to several collections without moving or copying it.
-
-Within a collection, **Remove from collection** leaves the original files and other memberships intact. **Delete files** shows the count and exact paths before using Obsidian’s configured trash handling. Files renamed or replaced after confirmation are skipped, and partial failures are reported.
-
-Tags and collections remain local plugin metadata and do not appear in Obsidian’s native tag search.
+Requires Obsidian **1.7.2+**. Existing vault files are preserved by downloading. Licensed under **GPL-3.0-only**.
 
 [Buy me a coffee](https://buymeacoffee.com/sahandprs)
 
 ### Updates
 
-- Tag chips with Enter/comma entry, removal, duplicate prevention, and existing-tag suggestions.
-- Checkbox selection, Shift-click ranges, Select all, and bulk tags that preserve existing details.
-- Named collections with multiple memberships and file/folder rename tracking.
-- Separate collection removal and confirmed deletion through Obsidian’s trash API.
-- Automated coverage for selection, chips, collection membership, cancellation, partial deletion failures, and save rollback.
+- Apply filename edits through Save details, preserving tags and descriptions.
+- Download original media from previews or multiple selections without archives.
+- Offer individual saves and supported native sharing.
+- Add tests for original bytes, filenames, combined rename/save, and read failures.

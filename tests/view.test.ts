@@ -26,6 +26,7 @@ async function setup(files = [file('Art/photo.jpg'), file('video.mp4'), file('cl
   const trashed: string[] = [];
   const app = { doc, vault: {
     getFiles: () => files,
+    readBinary: async () => new Uint8Array([1, 2, 3]).buffer,
     getAbstractFileByPath: (path: string) => files.find(item => item.path === path) || folders.get(path) || null,
     getAllLoadedFiles: () => [...files, ...folders.values()],
     createFolder: async (path: string) => { const folder = new module.exports.MockFolder(path); folders.set(path, folder); return folder; },
@@ -336,5 +337,50 @@ test('trash does not delete a file renamed after confirmation and metadata write
   plugin.saveData = async () => { throw new Error('Disk full'); };
   await assert.rejects(plugin.mutateData((data: any) => { data.collections.push({ id: 'new', name: 'New', paths: [] }); data.metadata['video.mp4'] = { tags: ['unsaved'], description: '' }; }));
   assert.deepEqual(plugin.data.collections, []); assert.equal(plugin.data.metadata['video.mp4'], undefined);
+  await view.onClose();
+});
+
+test('Save details commits a changed filename together with draft tags and description', async () => {
+  const { doc, plugin, view, click, files } = await setup();
+  click('Preview photo.jpg');
+  doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value = 'Renamed from save';
+  doc.querySelector<HTMLInputElement>('[aria-label="Tags"]')!.value = 'new';
+  doc.querySelector<HTMLTextAreaElement>('textarea')!.value = 'New description';
+  click('Save details'); await tick(); await tick();
+  assert.equal(files[0].path, 'Art/Renamed from save.jpg');
+  assert.deepEqual(plugin.stored.metadata['Art/Renamed from save.jpg'], { tags: ['new'], description: 'New description' });
+  assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value, 'Renamed from save');
+  await view.onClose();
+});
+test('Save details leaves file and details unchanged if filename is invalid', async () => {
+  const { doc, plugin, view, click, files } = await setup();
+  click('Preview photo.jpg');
+  doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value = '../bad';
+  doc.querySelector<HTMLInputElement>('[aria-label="Tags"]')!.value = 'unsaved';
+  click('Save details'); await tick();
+  assert.equal(files[0].path, 'Art/photo.jpg');
+  assert.equal(plugin.data.metadata['Art/photo.jpg'], undefined);
+  assert.match(doc.querySelector('.vg-rename-status')!.textContent!, /cannot contain/);
+  await view.onClose();
+});
+test('download prepares a copy and native sharing uses the prepared bytes without deleting', async () => {
+  const { doc, dom, view, click, trashed } = await setup();
+  let shared: any;
+  Object.defineProperty(dom.window.navigator, 'canShare', { value: () => true });
+  Object.defineProperty(dom.window.navigator, 'share', { value: async (data: any) => { shared = data; } });
+  click('Preview photo.jpg'); click('Download'); await tick();
+  assert.equal(doc.querySelector<HTMLButtonElement>('[aria-label="Save to device"]')!.disabled, false);
+  click('Share / Save to Files'); await tick();
+  assert.equal(shared.files[0].name, 'photo.jpg');
+  assert.deepEqual([...new Uint8Array(await shared.files[0].arrayBuffer())], [1, 2, 3]);
+  assert.deepEqual(trashed, []);
+  await view.onClose();
+});
+test('download reports read errors and never offers incomplete output', async () => {
+  const { doc, plugin, view, click } = await setup();
+  plugin.app.vault.readBinary = async () => { throw new Error('Unreadable media'); };
+  click('Select all'); click('Download'); await tick();
+  assert.match(doc.querySelector('.vg-action-modal')!.textContent!, /Unreadable media/);
+  assert.equal(doc.querySelector<HTMLButtonElement>('[aria-label="Save to device"]')!.disabled, true);
   await view.onClose();
 });
