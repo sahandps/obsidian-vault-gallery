@@ -1,17 +1,12 @@
-Vault Gallery 0.1.1 addresses the automated review findings and keeps the existing gallery and filename editing features.
+Media Gallery 0.1.2 updates the plugin's name and adds a support link.
 
-Requires Obsidian **1.7.2 or newer**. Licensed under **GNU GPL v3.0** (`GPL-3.0-only`); the license and corresponding source are included in the repository and source archives.
+Requires Obsidian **1.7.2 or newer**. Licensed under **GNU GPL v3.0** (`GPL-3.0-only`).
 
-To install manually, place `main.js`, `manifest.json`, and `styles.css` in `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable Vault Gallery. Existing installations can check for updates through their repository installer.
+The plugin ID stays `vault-gallery`, so existing installations keep their tags and settings. The repository URL and installation folder are unchanged. After updating, the plugin and its gallery tab appear as **Media Gallery**.
+
+[Buy me a coffee](https://buymeacoffee.com/sahandprs)
 
 ### Updates
 
-- Correct the minimum Obsidian version for the workspace API.
-- Fix direct style assignments and use CSS classes and properties for image zoom.
-- Remove `!important` and `:has` CSS patterns.
-- Use Obsidian element helpers and window timers.
-- Type metadata snapshots and validate control characters without a regex range.
-- Add official Obsidian lint checks to CI and the release build.
-- Add GitHub provenance attestations for release assets.
-- Limit downloadable release assets to `main.js`, `manifest.json`, and `styles.css`.
-- Revise the README with product descriptions beneath screenshots and update notes at the end.
+- Rename Vault Gallery to Media Gallery in the manifest, gallery, commands, and documentation.
+- Add the Buy Me a Coffee link to plugin metadata and GitHub funding links.

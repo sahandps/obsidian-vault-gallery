@@ -1,8 +1,8 @@
-# Vault Gallery
+# Media Gallery
 
 ![Media gallery with folders and filters](docs/images/gallery.jpg)
 
-Vault Gallery brings your vault's images, GIFs, videos, audio, and PDFs into one searchable media library. Browse by folder, filter by type or tag, and adjust the grid to see your media the way you prefer.
+Media Gallery brings your vault's images, GIFs, videos, audio, and PDFs into one searchable media library. Browse by folder, filter by type or tag, and adjust the grid to see your media the way you prefer.
 
 ![Expanded preview with editable filename, tags, and description](docs/images/details.jpg)
 
@@ -12,15 +12,15 @@ Screenshots use sample media in the browser preview. The plugin follows your Obs
 
 ## Manual installation
 
-Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/sahandps/obsidian-vault-gallery/releases/latest), place them in `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable **Vault Gallery** under Community plugins.
+Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/sahandps/obsidian-vault-gallery/releases/latest), place them in `<vault>/.obsidian/plugins/vault-gallery/`, reload Obsidian, and enable **Media Gallery** under Community plugins.
 
 ## Build and install from source
 
 1. Run `npm ci` and `npm run package` in this project (Node.js 22 or newer).
 2. In your vault, create `.obsidian/plugins/vault-gallery/`.
 3. Copy `main.js`, `manifest.json`, and `styles.css` from `release/vault-gallery/` into that folder.
-4. Reload Obsidian. In **Settings → Community plugins**, enable **Vault Gallery**. Community plugins must be enabled.
-5. Click the images icon in the left ribbon, or run **Vault Gallery: Open gallery** in the command palette.
+4. Reload Obsidian. In **Settings → Community plugins**, enable **Media Gallery**. Community plugins must be enabled.
+5. Click the images icon in the left ribbon, or run **Media Gallery: Open gallery** in the command palette.
 
 Use a test vault for your first run. This plugin has automated tests but has not yet been verified inside a running Obsidian app.
 
@@ -79,7 +79,17 @@ Run `npm run preview`, then open **http://127.0.0.1:4173/**. This runs the produ
 Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public License v3.0](LICENSE) (`GPL-3.0-only`). Continuous integration builds the plugin and runs its tests. To publish a new version, update `package.json`, `manifest.json`, `versions.json`, and `docs/release-notes.md`, then push a matching numeric Git tag (for example, `0.1.1`). GitHub Actions builds and attaches `main.js`, `manifest.json`, and `styles.css` to the release for installation in Obsidian.
 
 
+## Support
+
+If Media Gallery is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
+
 ## Updates
+
+### 0.1.2
+
+- Rename the plugin's display name from Vault Gallery to Media Gallery.
+- Keep the plugin ID, repository URL, and saved data unchanged for existing installations.
+- Add the Buy Me a Coffee link to the plugin manifest, repository funding links, and this README.
 
 ### 0.1.1
 
