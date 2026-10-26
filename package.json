@@ -1,0 +1,29 @@
+{
+  "name": "obsidian-vault-gallery",
+  "version": "0.1.0",
+  "description": "A visual home for media in your Obsidian vault.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs --watch",
+    "build": "tsc --noEmit && node esbuild.config.mjs",
+    "test": "tsx --test tests/*.test.ts",
+    "package": "npm run build && node scripts/package.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.25.0",
+    "jsdom": "^26.0.0",
+    "lucide": "^1.61.0",
+    "obsidian": "latest",
+    "tsx": "^4.0.0",
+    "typescript": "^5.8.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sahandps/obsidian-vault-gallery.git"
+  }
+}

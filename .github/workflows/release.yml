@@ -1,0 +1,36 @@
+name: Release
+on:
+  push:
+    tags: ['[0-9]*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run package
+      - name: Validate release version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          const manifest = JSON.parse(readFileSync('manifest.json'));
+          const pkg = JSON.parse(readFileSync('package.json'));
+          const versions = JSON.parse(readFileSync('versions.json'));
+          if (manifest.version !== process.env.RELEASE_TAG || pkg.version !== manifest.version || versions[manifest.version] !== manifest.minAppVersion) {
+            throw new Error('Tag, package, manifest, and versions.json must match');
+          }
+          JS
+      - name: Publish installable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" main.js manifest.json styles.css --verify-tag --title "$RELEASE_TAG" --notes-file docs/release-notes.md

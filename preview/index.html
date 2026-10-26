@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vault Gallery · Browser preview</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <div class="preview-banner">
+    <span><strong>Browser preview</strong><span class="preview-banner-note"> · Sample vault — tags save in this browser</span></span>
+    <div class="preview-controls">
+      <button id="add-media">Add local media</button><input id="file-picker" type="file" accept="image/*,video/*,audio/*,.pdf" multiple hidden>
+      <button id="theme-toggle" aria-label="Switch color theme">Dark mode</button>
+      <button id="reset-demo">Reset demo</button>
+    </div>
+  </div>
+  <div class="preview-workspace">
+    <div class="preview-appbar"><span class="preview-vault">◈ &nbsp; My creative vault</span><span class="preview-tab">▧ &nbsp; Vault Gallery</span><span class="preview-appbar-note">Local preview</span></div>
+    <div id="gallery"></div>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

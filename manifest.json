@@ -1,0 +1,10 @@
+{
+  "id": "vault-gallery",
+  "name": "Vault Gallery",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Browse vault images, GIFs, videos, audio, and PDFs with folders, filters, and editable tags.",
+  "author": "Sahand",
+  "isDesktopOnly": false,
+  "authorUrl": "https://github.com/sahandps"
+}
