@@ -2,11 +2,15 @@
 
 ![Media gallery with folders and filters](docs/images/gallery.jpg)
 
-Media Hub brings your vault's images, GIFs, videos, audio, and PDFs into one searchable media library. Browse by folder, filter by type or tag, and adjust the grid to see your media the way you prefer.
+Media Hub brings your vault's images, GIFs, videos, audio, and PDFs into one searchable media library. Browse by folder, filter by type or tag, and adjust the grid to see your media the way you prefer. Select individual files or Shift-click a range to add tags, organize collections, or delete files together.
 
 ![Expanded preview with editable filename, tags, and description](docs/images/details.jpg)
 
 Select any item for a larger preview and file details. Zoom into images, play video and audio, rename files, and add tags or descriptions without leaving the gallery. Tags stay attached when files are renamed while the plugin is running.
+
+![Collection with selected media and separate removal and deletion actions](docs/images/collections.jpg)
+
+Create named collections such as Travel or References. One file can belong to several collections without moving or copying it. **Remove from collection** changes only that collection; **Delete files** asks for confirmation with the count and file paths, then uses Obsidian’s configured trash handling.
 
 Screenshots use sample media in the browser preview. The plugin follows your Obsidian theme.
 
@@ -43,7 +47,10 @@ Use a test vault for your first run. This plugin has automated tests but has not
 - Expanded image/GIF preview with zoom, and video/audio playback controls.
 - Editable filename in the details panel: change the name and click **Rename file**, or press Enter. The extension and folder stay the same. Duplicate and invalid names are rejected. Obsidian manages updates to linked notes according to your vault settings. Gallery tags and unsaved detail edits stay attached when you rename from this panel.
 - File path, format, size, file-system dates, image dimensions, or playback duration in the details panel.
-- Editable comma-separated tags and descriptions. Click **Save details** before switching files. Tags are normalized to lowercase and duplicate tags are removed.
+- **Tag chips:** type a tag and press Enter or comma; remove a chip with ×. Existing tags appear as suggestions, with mouse or arrow-key selection. Click **Save details** before switching files. Tags are normalized to lowercase and deduplicated.
+- **Multiple selection:** check media cards, Shift-click for a range, or use **Select all** for all matching files, including cards not yet loaded. Changing filters clears selections that are no longer visible. Bulk **Add tags** preserves existing tags and descriptions.
+- **Collections:** create a group with the + beside Collections, or select files and use **Add to collection** to choose an existing group or create one. Membership follows renames and folder moves observed while the plugin is running.
+- **Deletion:** **Remove from collection** keeps files in the vault and other collections. **Delete files** confirms the selected count and exact file paths before using Obsidian’s trash handling. Files renamed or replaced after confirmation are skipped; failures are reported.
 - Previous/next buttons and left/right arrow navigation; Escape closes the preview when outside a form or player.
 - Opens the original file in a separate Obsidian tab. PDFs open in Obsidian's reader.
 - Theme-aware styles and a stacked preview on narrow panels.
@@ -54,9 +61,9 @@ Recognizes common image, video, audio, GIF, and PDF extensions, including HEIC, 
 
 To discover media, the gallery enumerates vault file paths locally; it does not upload file paths or media. It lists files exposed by Obsidian's Vault API, not hidden system folders or remote media embedded in notes. Images use browser lazy loading; videos and audio are loaded only in the selected preview. GIF thumbnails animate when loaded. The initial grid renders 80 items, then loads more as you scroll (with a manual button as fallback). The grid is incremental rather than fully virtualized; thumbnails are not pre-generated or cached separately, so very large original images can still use significant memory.
 
-## Where tags are stored
+## Where tags and collections are stored
 
-Tags and descriptions are saved in `.obsidian/plugins/vault-gallery/data.json` using Obsidian's plugin storage. They do not modify embedded EXIF/IPTC metadata or appear in Obsidian's native tag search. File moves and renames observed while the plugin is running preserve the associated details, including folder moves. Moves made while the plugin is disabled cannot be reconciled automatically. Sync the plugin's `data.json` if you need these details on another device; plugin data is not merged across simultaneous edits on multiple devices.
+Tags, descriptions, and collections are saved in `.obsidian/plugins/vault-gallery/data.json` using Obsidian's plugin storage. They do not modify embedded EXIF/IPTC metadata or appear in Obsidian's native tag search. File moves and renames observed while the plugin is running preserve the associated details and collection membership, including folder moves. Moves made while the plugin is disabled cannot be reconciled automatically. Sync the plugin's `data.json` if you need these details on another device; plugin data is not merged across simultaneous edits on multiple devices.
 
 The dates shown are file-system created/modified dates, not camera capture dates. Gallery details are saved explicitly and unsaved form edits are discarded when you change selection or close the preview.
 
@@ -73,13 +80,13 @@ npm run package  # installable folder under release/vault-gallery
 
 The runtime uses only Obsidian's API and native browser elements, without Node APIs, to support desktop and mobile. Mobile behavior still requires device testing.
 
-Before publishing: test in Obsidian with light/dark themes, a large vault, unavailable codecs, file sync, and mobile. This is an initial local version, not a published community plugin.
+Before publishing: test in Obsidian with light/dark themes, a large vault, unavailable codecs, file sync, and mobile. Release artifacts and automated checks are available on GitHub; browser preview checks do not replace device testing.
 
 ## Browser preview
 
 Run `npm run preview`, then open **http://127.0.0.1:4173/**. This runs the production gallery view with an Obsidian adapter and a sample vault, served only on your computer. Try the folder/type/tag filters, image zoom, animated GIF, audio/video playback, and editable details. Sample illustrations, animation, audio, PDF, and video are generated locally; no external media requests are needed.
 
-**Add media** lets you preview your own files in a simulated import folder for the current session; those files stay in the browser and are not uploaded. Tags and thumbnail size persist in browser local storage separately from Obsidian's plugin data. **Reset demo** clears the preview's saved details and reloads the sample vault. **Open in Obsidian** opens the original media in a browser tab in this preview. Renaming in the preview changes only its simulated vault, not the files on your disk, and lasts until you reload. Real vault discovery and file-change events require Obsidian.
+**Add media** lets you preview your own files in a simulated import folder for the current session; those files stay in the browser and are not uploaded. Tags, collections, and settings persist in browser local storage separately from Obsidian's plugin data. **Reset demo** clears the preview's saved details and reloads the sample vault. **Open in Obsidian** opens the original media in a browser tab in this preview. Renaming in the preview changes only its simulated vault, not the files on your disk, and lasts until you reload. Deletion in the preview affects simulated media for the current session only. Real vault discovery and file-change events require Obsidian.
 
 
 ## Releases and license
@@ -92,6 +99,15 @@ Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public Lice
 If Media Hub is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
 
 ## Updates
+
+### 0.3.0
+
+- Add removable tag chips with Enter/comma entry and existing-tag suggestions.
+- Add checkbox selection, Shift-click ranges, Select all, and bulk tag actions.
+- Add named collections with multiple memberships and rename/move tracking.
+- Separate collection removal from confirmed file deletion using Obsidian’s trash handling.
+- Preserve existing tags, descriptions, and settings during migration.
+- Add automated coverage for tags, selections, collections, deletion cancellation, partial failures, and save rollback.
 
 ### 0.2.0
 

@@ -132,3 +132,31 @@
   .vg-header h1 { font-size: 23px; }
 }
 .vg-settings-row { display: block; }
+
+.vg-root .vg-card-open { display: block; width: 100%; height: auto; padding: 0; border: 0; background: transparent; text-align: left; color: inherit; border-radius: 10px; }
+.vg-root .vg-card[data-previewed="true"] { border-color: var(--vg-accent); }
+.vg-root .vg-card[data-selected="true"] { border-color: var(--vg-accent); box-shadow: 0 0 0 2px var(--vg-accent); }
+.vg-root .vg-select-checkbox { position: absolute; z-index: 2; top: 10px; left: 10px; width: 18px; height: 18px; margin: 0; accent-color: var(--vg-accent); cursor: pointer; filter: drop-shadow(0 1px 3px #0004); }
+.vg-selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; padding: 12px; margin-bottom: 18px; border: 1px solid var(--vg-border); border-radius: 9px; background: var(--background-secondary); font-size: 11px; }
+.vg-selection-bar strong { margin-right: auto; white-space: nowrap; }
+.vg-selection-bar button { font-size: 11px; }
+.vg-root .vg-delete-button { color: var(--text-error, #b64e46); }
+.vg-collections-header { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; padding-right: 5px; }
+.vg-collections-header .vg-sidebar-label { padding-bottom: 0; }
+.vg-root .vg-collections-header .vg-icon-button { border: 0; background: transparent; width: 25px; height: 25px; }
+.vg-section-heading { flex-wrap: wrap; }
+.vg-section-heading h2 { margin-right: auto; }
+.vg-tag-editor { position: relative; border: 1px solid var(--background-modifier-border); border-radius: 7px; padding: 7px; background: var(--background-primary); min-width: 0; }
+.vg-tag-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.vg-tag-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px; border-radius: 5px; background: var(--background-secondary); color: var(--text-accent); font-size: 11px; max-width: 100%; overflow-wrap: anywhere; }
+.vg-tag-chip button { background: transparent; color: var(--text-muted); border: 0; padding: 0 2px; box-shadow: none; height: auto; font-size: 14px; line-height: 1; }
+.vg-tag-editor input, .vg-root .vg-tag-editor input { width: 100%; border: 0; background: transparent; box-shadow: none; padding: 7px 2px 2px; height: auto; min-height: 26px; font-size: 12px; }
+.vg-tag-suggestions { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; padding: 4px; background: var(--background-primary); border: 1px solid var(--background-modifier-border); border-radius: 6px; box-shadow: 0 8px 18px #0002; }
+.vg-tag-suggestions[hidden] { display: none; }
+.vg-tag-suggestions button { display: block; width: 100%; border: 0; background: transparent; text-align: left; font-size: 12px; padding: 7px; box-shadow: none; }
+.vg-tag-suggestions button:hover, .vg-tag-suggestions button[aria-selected="true"] { background: var(--background-modifier-hover); }
+.vg-action-modal .vg-setting-field { margin-bottom: 16px; }
+.vg-action-modal input[type="text"], .vg-action-modal select { width: 100%; }
+.vg-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+.vg-delete-list { max-height: 220px; overflow: auto; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; padding-left: 20px; }
+.vg-tag-suggestions { max-height: 180px; overflow: auto; }

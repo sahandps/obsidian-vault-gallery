@@ -23,6 +23,7 @@ async function setup(files = [file('Art/photo.jpg'), file('video.mp4'), file('cl
   const plugin = new GalleryPlugin();
   const folders = new Map<string, any>();
   const created: string[] = [];
+  const trashed: string[] = [];
   const app = { doc, vault: {
     getFiles: () => files,
     getAbstractFileByPath: (path: string) => files.find(item => item.path === path) || folders.get(path) || null,
@@ -35,6 +36,10 @@ async function setup(files = [file('Art/photo.jpg'), file('video.mp4'), file('cl
     getResourcePath: () => 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
     on: (name: string, callback: (...args: any[]) => void) => { listeners.set(name, callback); return callback; },
   }, fileManager: {
+    trashFile: async (target: any) => {
+      const index = files.indexOf(target); if (index < 0) throw new Error('Missing file');
+      trashed.push(target.path); files.splice(index, 1); listeners.get('delete')?.(target);
+    },
     renameFile: async (file: any, newPath: string) => {
       const oldPath = file.path;
       file.path = newPath; file.name = newPath.split('/').pop()!;
@@ -49,7 +54,7 @@ async function setup(files = [file('Art/photo.jpg'), file('video.mp4'), file('cl
     const node = doc.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
     assert.ok(node, `Button ${label} exists`); node.click();
   };
-  return { dom, doc, plugin, view, click, listeners, files, opened, created, folders };
+  return { dom, doc, plugin, view, click, listeners, files, opened, created, folders, trashed };
 }
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -69,7 +74,7 @@ test('gallery filters, opens preview, saves tags, reopens saved details, and ope
   click('Save details'); await tick();
   assert.deepEqual(plugin.stored.metadata['Art/photo.jpg'].tags, ['travel', 'blue']);
   click('Close preview'); click('Preview photo.jpg');
-  assert.equal(doc.querySelector<HTMLInputElement>('.vg-inspector input:not(.vg-filename)')!.value, 'travel, blue');
+  assert.deepEqual([...doc.querySelectorAll('.vg-inspector .vg-tag-chip > span')].map(node => node.textContent), ['#travel', '#blue']);
   click('Open in Obsidian'); await tick();
   assert.equal(opened[0].path, 'Art/photo.jpg');
   const tagFilter = doc.querySelector<HTMLSelectElement>('[aria-label="Filter by tag"]')!;
@@ -146,12 +151,12 @@ test('rename preserves the extension, saved tags, draft details and selected pre
   name.value = 'New photo'; click('Rename file'); await tick();
   assert.equal(files[0].path, 'Art/New photo.jpg');
   assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value, 'New photo');
-  assert.equal(doc.querySelector<HTMLInputElement>('.vg-inspector input:not(.vg-filename)')!.value, 'unsaved');
+  assert.deepEqual([...doc.querySelectorAll('.vg-inspector .vg-tag-chip > span')].map(node => node.textContent), ['#saved', '#unsaved']);
   assert.deepEqual(plugin.data.metadata['Art/New photo.jpg'].tags, ['saved']);
   assert.equal(plugin.data.metadata['Art/photo.jpg'], undefined);
   assert.ok(doc.querySelector('[aria-label="Preview New photo.jpg"][aria-pressed="true"]'));
   click('Save details'); await tick();
-  assert.deepEqual(plugin.stored.metadata['Art/New photo.jpg'].tags, ['unsaved']);
+  assert.deepEqual(plugin.stored.metadata['Art/New photo.jpg'].tags, ['saved', 'unsaved']);
   plugin.onunload(); await view.onClose();
 });
 
@@ -226,7 +231,7 @@ test('folder pane collapse persists and settings save the destination and layout
   assert.equal(plugin.stored.importFolder, 'Imported/Images');
   assert.equal(plugin.stored.thumbnailSize, 300);
   assert.equal(doc.querySelector<HTMLElement>('.vg-sidebar')!.hidden, false);
-  doc.querySelector<HTMLButtonElement>('[aria-label="Close settings"]')!.click();
+  doc.querySelector<HTMLButtonElement>('[aria-label="Close dialog"]')!.click();
   const picker = doc.querySelector<HTMLInputElement>('[aria-label="Choose media files"]')!;
   Object.defineProperty(picker, 'files', { value: [upload('added.png')] });
   picker.dispatchEvent(new dom.window.Event('change')); await tick();
@@ -234,4 +239,102 @@ test('folder pane collapse persists and settings save the destination and layout
   assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value, 'added');
   assert.equal(doc.querySelector<HTMLButtonElement>('[aria-label="Add media"]')!.disabled, false);
   plugin.onunload(); await view.onClose();
+});
+
+
+test('tag chips commit on Enter and comma, suggest existing tags, and remove independently', async () => {
+  const { doc, dom, plugin, view, click } = await setup();
+  plugin.data.metadata['video.mp4'] = { tags: ['travel', 'work'], description: '' };
+  click('Preview photo.jpg');
+  const input = doc.querySelector<HTMLInputElement>('[aria-label="Tags"]')!;
+  input.value = 'tra'; input.dispatchEvent(new dom.window.Event('input'));
+  assert.ok(doc.querySelector('[role="option"]'));
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+  input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  input.value = 'blue'; input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: ',', bubbles: true }));
+  input.value = '#TRAVEL'; input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  assert.equal(doc.querySelectorAll('.vg-inspector .vg-tag-chip').length, 2);
+  click('Remove tag blue');
+  click('Save details'); await tick();
+  assert.deepEqual(plugin.stored.metadata['Art/photo.jpg'].tags, ['travel']);
+  await view.onClose();
+});
+
+test('checkbox selection supports ranges, bulk tags preserve descriptions, and filters prune selection', async () => {
+  const { doc, dom, plugin, view, click } = await setup();
+  plugin.data.metadata['Art/photo.jpg'] = { tags: ['old'], description: 'Keep this' };
+  const checkboxes = [...doc.querySelectorAll<HTMLInputElement>('.vg-select-checkbox')];
+  checkboxes[0].click();
+  checkboxes[2].dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, shiftKey: true }));
+  assert.equal(doc.querySelectorAll('.vg-select-checkbox:checked').length, 3);
+  assert.equal(doc.querySelector<HTMLElement>('.vg-preview')!.hidden, true);
+  const paths = [...doc.querySelectorAll<HTMLElement>('.vg-card[data-selected="true"]')].map(card => card.dataset.path!);
+  click('Add tags');
+  const input = doc.querySelector<HTMLInputElement>('[aria-label="Tags to add"]')!;
+  input.value = 'shared'; input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  const modal = doc.querySelector('[role="dialog"]')!;
+  [...modal.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Apply tags')!.click(); await tick();
+  for (const path of paths) assert.ok(plugin.stored.metadata[path].tags.includes('shared'));
+  assert.equal(plugin.stored.metadata['Art/photo.jpg'].description, 'Keep this');
+  assert.ok(plugin.stored.metadata['Art/photo.jpg'].tags.includes('old'));
+  click('Videos');
+  assert.equal(doc.querySelectorAll('.vg-select-checkbox:checked').length, 0);
+  assert.equal(doc.querySelector<HTMLElement>('.vg-selection-bar')!.hidden, true);
+  await view.onClose();
+});
+
+test('collections allow multiple membership; removing membership never deletes files', async () => {
+  const { doc, plugin, view, click, files, trashed } = await setup();
+  doc.querySelector<HTMLInputElement>('[aria-label="Select photo.jpg"]')!.click();
+  const addCollection = async (name: string) => {
+    click('Add to collection');
+    doc.querySelector<HTMLInputElement>('[aria-label="New collection name"]')!.value = name;
+    const modal = doc.querySelector('[role="dialog"]')!;
+    [...modal.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Add to collection')!.click(); await tick();
+  };
+  await addCollection('Travel'); await addCollection('References');
+  assert.equal(plugin.data.collections.length, 2);
+  for (const collection of plugin.data.collections) assert.deepEqual(collection.paths, ['Art/photo.jpg']);
+  click('Collection Travel');
+  assert.equal(doc.querySelectorAll('.vg-card').length, 1);
+  click('Remove from collection'); await tick();
+  assert.equal(plugin.data.collections.find((c: any) => c.name === 'Travel').paths.length, 0);
+  assert.deepEqual(plugin.data.collections.find((c: any) => c.name === 'References').paths, ['Art/photo.jpg']);
+  assert.equal(files.length, 5); assert.deepEqual(trashed, []);
+  await view.onClose();
+});
+
+test('deletion requires explicit confirmation and reports partial trash failures', async () => {
+  const { doc, plugin, view, click, files, trashed } = await setup();
+  const targets = [files[0], files[1]];
+  plugin.data.collections.push({ id: 'one', name: 'Keep', paths: targets.map(f => f.path) });
+  for (const target of targets) doc.querySelector<HTMLInputElement>(`[aria-label="Select ${target.name}"]`)!.click();
+  click('Delete files');
+  assert.match(doc.querySelector('[role="dialog"]')!.textContent!, /Delete 2 files/);
+  assert.deepEqual(trashed, []);
+  [...doc.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === 'Cancel')!.click();
+  assert.equal(files.length, 5);
+  click('Delete files');
+  const originalTrash = plugin.app.fileManager.trashFile;
+  plugin.app.fileManager.trashFile = async (file: any) => { if (file === targets[1]) throw new Error('Permission denied'); await originalTrash(file); };
+  const originalError = console.error; console.error = () => {};
+  try {
+    [...doc.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === 'Move 2 files to trash')!.click(); await tick();
+  } finally { console.error = originalError; }
+  assert.deepEqual(trashed, ['Art/photo.jpg']);
+  assert.ok(files.includes(targets[1]));
+  assert.deepEqual(plugin.data.collections[0].paths, ['video.mp4']);
+  assert.match(doc.querySelector('[role="dialog"]')!.textContent!, /Could not delete 1/);
+  plugin.onunload(); await view.onClose();
+});
+
+test('trash does not delete a file renamed after confirmation and metadata writes roll back on error', async () => {
+  const { plugin, view, files } = await setup();
+  const target = { file: files[0], path: files[0].path }; files[0].path = 'Art/renamed.jpg';
+  assert.deepEqual((await plugin.trashMedia([target])).failed, ['Art/photo.jpg']);
+  assert.ok(files.includes(target.file));
+  plugin.saveData = async () => { throw new Error('Disk full'); };
+  await assert.rejects(plugin.mutateData((data: any) => { data.collections.push({ id: 'new', name: 'New', paths: [] }); data.metadata['video.mp4'] = { tags: ['unsaved'], description: '' }; }));
+  assert.deepEqual(plugin.data.collections, []); assert.equal(plugin.data.metadata['video.mp4'], undefined);
+  await view.onClose();
 });

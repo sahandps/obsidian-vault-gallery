@@ -52,6 +52,10 @@ const app: any = {
     on: (name: string, callback: (...args: any[]) => void) => { listeners.set(name, callback); return {}; },
   },
   fileManager: {
+    trashFile: async (file: PreviewFile) => {
+      const index = files.indexOf(file); if (index < 0) throw new Error('File not found.');
+      files.splice(index, 1); listeners.get('delete')?.(file);
+    },
     renameFile: async (file: PreviewFile, newPath: string) => {
       if (files.some(item => item.path === newPath)) throw new Error('A file with this name already exists.');
       const oldPath = file.path;

@@ -8,16 +8,18 @@ export interface MediaFile {
   stat: { ctime: number; mtime: number; size: number };
 }
 export interface MediaMetadata { tags: string[]; description: string }
+export interface MediaCollection { id: string; name: string; paths: string[] }
 export interface GalleryData {
   version: 1;
   thumbnailSize: number;
   importFolder: string;
   sidebarCollapsed: boolean;
   metadata: Record<string, MediaMetadata>;
+  collections: MediaCollection[];
 }
 export interface Filters {
   query: string; kind: MediaKind | 'all'; folder: string | null;
-  tag: string; sort: SortOrder;
+  tag: string; sort: SortOrder; collection?: string | null;
 }
 const extensions: Record<MediaKind, Set<string>> = {
   image: new Set(['avif', 'bmp', 'jpeg', 'jpg', 'png', 'svg', 'webp', 'heic', 'heif', 'tif', 'tiff', 'ico']),
@@ -38,7 +40,7 @@ export function getMetadata(data: GalleryData, path: string): MediaMetadata {
     ? data.metadata[path] : { tags: [], description: '' };
 }
 export function sanitizeData(raw: unknown): GalleryData {
-  const data: GalleryData = { version: 1, thumbnailSize: 220, importFolder: 'Media', sidebarCollapsed: false, metadata: Object.create(null) as Record<string, MediaMetadata> };
+  const data: GalleryData = { version: 1, thumbnailSize: 220, importFolder: 'Media', sidebarCollapsed: false, collections: [], metadata: Object.create(null) as Record<string, MediaMetadata> };
   if (!raw || typeof raw !== 'object') return data;
   const input = raw as Partial<GalleryData>;
   if (typeof input.thumbnailSize === 'number' && Number.isFinite(input.thumbnailSize)) {
@@ -57,6 +59,14 @@ export function sanitizeData(raw: unknown): GalleryData {
       };
     }
   }
+  if (Array.isArray(input.collections)) {
+    const ids = new Set<string>();
+    for (const value of input.collections) {
+      if (!value || typeof value.id !== 'string' || !value.id || ids.has(value.id) || typeof value.name !== 'string' || !value.name.trim()) continue;
+      ids.add(value.id);
+      data.collections.push({ id: value.id, name: value.name.trim(), paths: Array.isArray(value.paths) ? [...new Set(value.paths.filter(path => typeof path === 'string'))] : [] });
+    }
+  }
   return data;
 }
 export function inFolder(path: string, folder: string | null): boolean {
@@ -64,7 +74,10 @@ export function inFolder(path: string, folder: string | null): boolean {
 }
 export function filterMedia<T extends MediaFile>(files: T[], data: GalleryData, filters: Filters): T[] {
   const terms = filters.query.toLowerCase().trim().split(/\s+/).filter(Boolean);
+  const collection = filters.collection ? data.collections.find(item => item.id === filters.collection) : null;
+  const members = collection ? new Set(collection.paths) : null;
   return files.filter(file => {
+    if (filters.collection && (!members || !members.has(file.path))) return false;
     const kind = mediaKind(file.extension);
     if (!kind || (filters.kind !== 'all' && kind !== filters.kind) || !inFolder(file.path, filters.folder)) return false;
     const meta = getMetadata(data, file.path);
@@ -80,6 +93,9 @@ export function filterMedia<T extends MediaFile>(files: T[], data: GalleryData, 
   });
 }
 export function moveMetadata(data: GalleryData, oldPath: string, newPath: string): void {
+  for (const collection of data.collections) {
+    collection.paths = [...new Set(collection.paths.map(path => path === oldPath || path.startsWith(`${oldPath}/`) ? newPath + path.slice(oldPath.length) : path))];
+  }
   for (const path of Object.keys(data.metadata)) {
     if (path === oldPath || path.startsWith(`${oldPath}/`)) {
       data.metadata[newPath + path.slice(oldPath.length)] = data.metadata[path];
@@ -88,6 +104,7 @@ export function moveMetadata(data: GalleryData, oldPath: string, newPath: string
   }
 }
 export function removeMetadata(data: GalleryData, removedPath: string): void {
+  for (const collection of data.collections) collection.paths = collection.paths.filter(path => path !== removedPath && !path.startsWith(`${removedPath}/`));
   for (const path of Object.keys(data.metadata)) {
     if (path === removedPath || path.startsWith(`${removedPath}/`)) delete data.metadata[path];
   }
@@ -134,4 +151,13 @@ export function importPath(folder: string, name: string, suffix = 0): string {
   const extension = name.slice(dot + 1);
   const filename = renamedPath({ path: name, name, extension }, suffix ? `${stem} (${suffix})` : stem);
   return folder ? `${folder}/${filename}` : filename;
+}
+
+export function createCollection(data: GalleryData, name: string, paths: readonly string[] = []): MediaCollection {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Enter a collection name.');
+  if (data.collections.some(item => item.name.toLowerCase() === trimmed.toLowerCase())) throw new Error('A collection with this name already exists.');
+  const collection = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`, name: trimmed, paths: [...new Set(paths)] };
+  data.collections.push(collection);
+  return collection;
 }

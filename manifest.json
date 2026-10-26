@@ -1,9 +1,9 @@
 {
   "id": "vault-gallery",
   "name": "Media Hub",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minAppVersion": "1.7.2",
-  "description": "Browse vault images, GIFs, videos, audio, and PDFs with folders, filters, and editable tags.",
+  "description": "Browse vault media with previews, tag chips, collections, and bulk actions.",
   "author": "Sahand",
   "isDesktopOnly": false,
   "authorUrl": "https://github.com/sahandps",

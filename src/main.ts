@@ -3,10 +3,12 @@
 
 import { ItemView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, setIcon } from 'obsidian';
 import {
-  filterMedia, formatSize, getMetadata, importPath, mediaAccept, mediaKind, normalizeImportFolder, moveMetadata, parseTags,
+  createCollection, filterMedia, formatSize, getMetadata, importPath, mediaAccept, mediaKind, normalizeImportFolder, moveMetadata, parseTags,
   removeMetadata, renamedPath, sanitizeData, type Filters, type GalleryData, type MediaKind, type SortOrder,
 } from './model';
 
+import { TagEditor } from './tag-editor';
+import { GalleryActionModal } from './action-modal';
 import { GallerySettingsModal, GallerySettingsTab } from './settings';
 
 const VIEW_TYPE = 'vault-gallery';
@@ -151,6 +153,40 @@ export default class MediaHubPlugin extends Plugin {
     this.saveQueue = write;
     return write;
   }
+  async mutateData(change: (data: GalleryData) => void): Promise<void> {
+    const previous = sanitizeData(this.data);
+    change(this.data);
+    const next = sanitizeData(this.data);
+    try { await this.persist(); }
+    catch (error) {
+      // Roll back changed fields only if another operation has not since changed them.
+      for (const path of new Set([...Object.keys(previous.metadata), ...Object.keys(next.metadata)])) {
+        if (JSON.stringify(previous.metadata[path]) === JSON.stringify(next.metadata[path])) continue;
+        if (JSON.stringify(this.data.metadata[path]) !== JSON.stringify(next.metadata[path])) continue;
+        if (Object.prototype.hasOwnProperty.call(previous.metadata, path)) this.data.metadata[path] = previous.metadata[path];
+        else delete this.data.metadata[path];
+      }
+      if (JSON.stringify(this.data.collections) === JSON.stringify(next.collections)) this.data.collections = previous.collections;
+      throw error;
+    }
+    this.refreshViews();
+  }
+  async trashMedia(targets: readonly { file: TFile; path: string }[]): Promise<{ deleted: string[]; failed: string[] }> {
+    const deleted: string[] = [], failed: string[] = [];
+    for (const target of targets) {
+      // A confirmation applies to these exact files, not replacements or renamed files.
+      if (target.file.path !== target.path || !this.app.vault.getFiles().includes(target.file)) { failed.push(target.path); continue; }
+      try {
+        await this.app.fileManager.trashFile(target.file);
+        removeMetadata(this.data, target.path); deleted.push(target.path);
+      } catch (error) { console.error('Media Hub could not move a file to trash', error); failed.push(target.path); }
+    }
+    if (deleted.length) {
+      try { await this.persist(); } catch (error) { this.reportSaveError(error); }
+    }
+    this.refreshViews();
+    return { deleted, failed };
+  }
   reportSaveError(error: unknown): void {
     console.error('Media Hub save failed', error);
     new Notice('Could not save gallery data. Check that your vault is writable.');
@@ -160,6 +196,10 @@ export default class MediaHubPlugin extends Plugin {
 export class GalleryView extends ItemView {
   private filters: Filters = { query: '', kind: 'all', folder: null, tag: '', sort: 'newest' };
   private selectedPath: string | null = null;
+  private selectedPaths = new Set<string>();
+  private selectionAnchor: string | null = null;
+  private selectionBar!: HTMLElement;
+  private tagEditor: TagEditor | null = null;
   private files: TFile[] = [];
   private filtered: TFile[] = [];
   private visibleCount = PAGE_SIZE;
@@ -225,7 +265,7 @@ export class GalleryView extends ItemView {
         const message = `${result.paths.length} imported${result.failed.length ? `, ${result.failed.length} failed` : ''}.`;
         importStatus.textContent = message;
         if (result.paths.length) {
-          this.filters.query = ''; this.filters.kind = 'all'; this.filters.tag = '';
+          this.filters.query = ''; this.filters.kind = 'all'; this.filters.tag = ''; this.filters.collection = null;
           this.filters.folder = result.paths[0].includes('/') ? result.paths[0].slice(0, result.paths[0].lastIndexOf('/')) : '';
           this.search.value = ''; this.refresh();
           this.select(result.paths[0]);
@@ -300,6 +340,10 @@ export class GalleryView extends ItemView {
       sort.value = 'newest';
       this.refresh();
     }, 'vg-text-button');
+    button(sectionHeading, 'Select all', null, () => { this.selectedPaths = new Set(this.filtered.map(file => file.path)); this.syncSelection(); }, 'vg-text-button');
+    this.selectionBar = el(scroll, 'div', 'vg-selection-bar');
+    this.selectionBar.setAttribute('aria-label', 'Selected file actions');
+    this.selectionBar.hidden = true;
     this.preview = el(scroll, 'section', 'vg-preview');
     this.preview.hidden = true;
     this.preview.setAttribute('aria-label', 'Selected media');
@@ -324,6 +368,9 @@ export class GalleryView extends ItemView {
   }
 
   onPathMoved(oldPath: string, newPath: string): void {
+    const moved = (path: string) => path === oldPath || path.startsWith(`${oldPath}/`) ? newPath + path.slice(oldPath.length) : path;
+    this.selectedPaths = new Set([...this.selectedPaths].map(moved));
+    if (this.selectionAnchor) this.selectionAnchor = moved(this.selectionAnchor);
     if (this.selectedPath === oldPath || this.selectedPath?.startsWith(`${oldPath}/`)) {
       this.selectedPath = newPath + this.selectedPath.slice(oldPath.length);
     }
@@ -336,6 +383,7 @@ export class GalleryView extends ItemView {
   refresh(): void {
     if (!this.grid) return;
     this.files = this.app.vault.getFiles().filter(file => mediaKind(file.extension));
+    if (this.filters.collection && !this.plugin.data.collections.some(item => item.id === this.filters.collection)) this.filters.collection = null;
     this.renderTagOptions();
     this.renderFolders();
     this.applyFilters();
@@ -371,17 +419,30 @@ export class GalleryView extends ItemView {
     el(this.sidebar, 'div', 'vg-sidebar-label', 'LIBRARY');
     const folderButton = (label: string, path: string | null, count: number, depth: number) => {
       const row = button(this.sidebar, label, null, () => {
-        this.filters.folder = path; this.renderFolders(); this.applyFilters();
+        this.filters.folder = path; this.filters.collection = null; this.renderFolders(); this.applyFilters();
       }, 'vg-folder');
       row.setCssProps({ '--vg-depth': String(Math.min(depth, 5)) });
       row.title = path === null ? 'All media in the vault' : path || 'Vault root';
-      row.setAttribute('aria-pressed', String(this.filters.folder === path));
+      row.setAttribute('aria-pressed', String(!this.filters.collection && this.filters.folder === path));
       row.replaceChildren();
       setIcon(el(row, 'span', 'vg-icon'), path === null ? 'library' : 'folder');
       el(row, 'span', 'vg-folder-name', label);
       el(row, 'span', 'vg-folder-count', String(count));
     };
     folderButton('All media', null, this.files.length, 0);
+    const collectionsHeader = el(this.sidebar, 'div', 'vg-collections-header');
+    el(collectionsHeader, 'span', 'vg-sidebar-label', 'COLLECTIONS');
+    button(collectionsHeader, 'New collection', 'plus', () => this.openCollectionDialog([]), 'vg-icon-button');
+    const knownPaths = new Set(this.files.map(file => file.path));
+    for (const collection of [...this.plugin.data.collections].sort((a, b) => a.name.localeCompare(b.name))) {
+      const row = button(this.sidebar, `Collection ${collection.name}`, null, () => {
+        this.filters.collection = collection.id; this.filters.folder = null; this.renderFolders(); this.applyFilters();
+      }, 'vg-folder');
+      row.setAttribute('aria-pressed', String(this.filters.collection === collection.id));
+      row.replaceChildren(); setIcon(el(row, 'span', 'vg-icon'), 'album');
+      el(row, 'span', 'vg-folder-name', collection.name);
+      el(row, 'span', 'vg-folder-count', String(collection.paths.filter(path => knownPaths.has(path)).length));
+    }
     el(this.sidebar, 'div', 'vg-sidebar-label vg-folder-label', 'FOLDERS');
     const counts = new Map<string, number>();
     for (const file of this.files) {
@@ -407,7 +468,11 @@ export class GalleryView extends ItemView {
     this.visibleCount = PAGE_SIZE;
     for (const [kind, tab] of this.tabs) tab.setAttribute('aria-pressed', String(this.filters.kind === kind));
     this.tagSelect.value = this.filters.tag;
-    this.folderTitle.textContent = this.filters.folder === null ? 'All media' : this.filters.folder || 'Vault root';
+    const collection = this.plugin.data.collections.find(item => item.id === this.filters.collection);
+    this.folderTitle.textContent = collection ? collection.name : this.filters.folder === null ? 'All media' : this.filters.folder || 'Vault root';
+    const visible = new Set(this.filtered.map(file => file.path));
+    this.selectedPaths = new Set([...this.selectedPaths].filter(path => visible.has(path)));
+    if (this.selectionAnchor && !visible.has(this.selectionAnchor)) this.selectionAnchor = null;
     this.counter.textContent = `${this.filtered.length} / ${this.files.length} files`;
     if (this.selectedPath && !this.filtered.some(file => file.path === this.selectedPath)) this.select(null);
     if (this.selectedPath) {
@@ -420,6 +485,7 @@ export class GalleryView extends ItemView {
       if (position) position.textContent = `${index + 1} of ${this.filtered.length}`;
     }
     this.renderGrid();
+    this.syncSelection();
   }
 
   private renderGrid(): void {
@@ -428,8 +494,8 @@ export class GalleryView extends ItemView {
     if (this.filtered.length === 0) {
       const empty = el(this.grid, 'div', 'vg-empty');
       setIcon(el(empty, 'div', 'vg-empty-icon'), this.files.length ? 'search-x' : 'images');
-      el(empty, 'h3', '', this.files.length ? 'No matching media' : 'A home for your media');
-      el(empty, 'p', '', this.files.length ? 'Try another folder, media type, tag, or search.' : 'Add images, GIFs, videos, audio, or PDFs to your vault. They will appear here automatically.');
+      el(empty, 'h3', '', this.filters.collection ? 'No matching media in this collection' : this.files.length ? 'No matching media' : 'A home for your media');
+      el(empty, 'p', '', this.filters.collection ? 'Select files in All media and use Add to collection, or clear your filters.' : this.files.length ? 'Try another folder, media type, tag, or search.' : 'Add images, GIFs, videos, audio, or PDFs to your vault. They will appear here automatically.');
       return;
     }
     this.appendPage();
@@ -439,6 +505,7 @@ export class GalleryView extends ItemView {
     this.grid.querySelector('.vg-load-more')?.remove();
     const start = this.grid.querySelectorAll('.vg-card').length;
     for (const file of this.filtered.slice(start, this.visibleCount)) this.renderCard(file);
+    this.syncSelection();
     if (this.visibleCount < this.filtered.length) {
       const more = button(this.grid, `Load more (${this.filtered.length - this.visibleCount} remaining)`, null, () => {
         this.observer?.disconnect();
@@ -456,11 +523,24 @@ export class GalleryView extends ItemView {
 
   private renderCard(file: TFile): void {
     const kind = mediaKind(file.extension)!;
-    const card = button(this.grid, `Preview ${file.name}`, null, () => this.select(file.path), 'vg-card');
-    card.setAttribute('aria-pressed', String(file.path === this.selectedPath));
+    const card = el(this.grid, 'div', 'vg-card');
     card.dataset.path = file.path;
-    card.replaceChildren();
-    const thumb = el(card, 'div', 'vg-thumb');
+    card.dataset.previewed = String(file.path === this.selectedPath);
+    const open = button(card, `Preview ${file.name}`, null, () => this.select(file.path), 'vg-card-open');
+    open.textContent = '';
+    open.dataset.path = file.path;
+    open.setAttribute('aria-pressed', String(file.path === this.selectedPath));
+    const checkbox = el(card, 'input', 'vg-select-checkbox');
+    checkbox.type = 'checkbox'; checkbox.checked = this.selectedPaths.has(file.path);
+    checkbox.setAttribute('aria-label', `Select ${file.name}`);
+    checkbox.addEventListener('click', event => {
+      const index = this.filtered.findIndex(item => item.path === file.path);
+      const anchor = this.filtered.findIndex(item => item.path === this.selectionAnchor);
+      const paths = event.shiftKey && anchor >= 0 ? this.filtered.slice(Math.min(index, anchor), Math.max(index, anchor) + 1).map(item => item.path) : [file.path];
+      for (const path of paths) { if (checkbox.checked) this.selectedPaths.add(path); else this.selectedPaths.delete(path); }
+      this.selectionAnchor = file.path; this.syncSelection();
+    });
+    const thumb = el(open, 'div', 'vg-thumb');
     if (kind === 'image' || kind === 'gif') {
       const image = el(thumb, 'img');
       image.alt = ''; image.loading = 'lazy'; image.decoding = 'async';
@@ -476,7 +556,7 @@ export class GalleryView extends ItemView {
       el(thumb, 'span', 'vg-no-preview', kind === 'video' ? 'Select to play' : kind === 'audio' ? 'Select to listen' : 'PDF document');
     }
     el(thumb, 'span', 'vg-badge', file.extension.toUpperCase());
-    const info = el(card, 'div', 'vg-card-info');
+    const info = el(open, 'div', 'vg-card-info');
     el(info, 'div', 'vg-card-name', file.name);
     const meta = getMetadata(this.plugin.data, file.path);
     el(info, 'div', 'vg-card-subtitle', meta.tags.length ? meta.tags.map(tag => `#${tag}`).join('  ') : `${formatSize(file.stat.size)} · ${file.parent?.path === '/' ? 'Vault root' : file.parent?.path || 'Vault root'}`);
@@ -485,11 +565,14 @@ export class GalleryView extends ItemView {
   private select(path: string | null): void {
     stopMedia(this.preview);
     this.selectedPath = path;
+    this.tagEditor = null;
     this.previewImage = null; this.zoom = 1;
     this.preview.replaceChildren();
     this.preview.hidden = path === null;
-    for (const card of Array.from(this.grid.querySelectorAll<HTMLButtonElement>('.vg-card'))) {
+    for (const card of Array.from(this.grid.querySelectorAll<HTMLButtonElement>('.vg-card-open'))) {
       card.setAttribute('aria-pressed', String(card.dataset.path === path));
+      const wrapper = card.closest<HTMLElement>('.vg-card');
+      if (wrapper) wrapper.dataset.previewed = String(card.dataset.path === path);
     }
     if (!path) return;
     const file = this.files.find(item => item.path === path);
@@ -510,7 +593,7 @@ export class GalleryView extends ItemView {
     }
     button(tools, 'Close preview', 'x', () => {
       this.select(null);
-      const card = Array.from(this.grid.querySelectorAll<HTMLButtonElement>('.vg-card')).find(item => item.dataset.path === path);
+      const card = Array.from(this.grid.querySelectorAll<HTMLButtonElement>('.vg-card-open')).find(item => item.dataset.path === path);
       (card || this.contentEl).focus();
     }, 'vg-icon-button vg-close');
     const viewport = el(stage, 'div', 'vg-viewport');
@@ -570,25 +653,27 @@ export class GalleryView extends ItemView {
     row('Created', new Date(file.stat.ctime).toLocaleDateString());
     row('Modified', new Date(file.stat.mtime).toLocaleDateString());
     const metadata = getMetadata(this.plugin.data, file.path);
-    const tagLabel = el(inspector, 'label', 'vg-field');
+    const tagLabel = el(inspector, 'div', 'vg-field');
     el(tagLabel, 'span', '', 'Tags');
-    const tags = el(tagLabel, 'input');
-    tags.type = 'text'; tags.value = metadata.tags.join(', '); tags.placeholder = 'Travel, inspiration, work';
-    el(inspector, 'p', 'vg-hint', 'Separate tags with commas.');
+    let markDirty = () => {};
+    const tags = new TagEditor(tagLabel, metadata.tags, () => this.knownTags(), () => markDirty());
+    this.tagEditor = tags;
+    el(inspector, 'p', 'vg-hint', 'Press Enter or comma to add a tag.');
     const descriptionLabel = el(inspector, 'label', 'vg-field');
     el(descriptionLabel, 'span', '', 'Description');
     const description = el(descriptionLabel, 'textarea');
     description.rows = 3; description.value = metadata.description; description.placeholder = 'Add a little context…';
     const save = button(inspector, 'Save details', null, () => {
       const old = getMetadata(this.plugin.data, file.path);
-      this.plugin.data.metadata[file.path] = { tags: parseTags(tags.value), description: description.value.trim() };
-      save.disabled = true; rename.disabled = true; tags.disabled = true; description.disabled = true; save.textContent = 'Saving…';
+      this.plugin.data.metadata[file.path] = { tags: tags.getTags(), description: description.value.trim() };
+      save.disabled = true; rename.disabled = true; tags.setDisabled(true); description.disabled = true; save.textContent = 'Saving…';
       void this.plugin.persist().then(() => {
-        save.disabled = false; rename.disabled = false; tags.disabled = false; description.disabled = false; save.textContent = 'Saved';
+        save.disabled = false; rename.disabled = false; tags.setDisabled(false); description.disabled = false; save.textContent = 'Saved';
+        tags.setTags(getMetadata(this.plugin.data, file.path).tags);
         this.plugin.refreshViews();
       }).catch(error => {
         this.plugin.data.metadata[file.path] = old;
-        save.disabled = false; rename.disabled = false; tags.disabled = false; description.disabled = false; save.textContent = 'Retry save';
+        save.disabled = false; rename.disabled = false; tags.setDisabled(false); description.disabled = false; save.textContent = 'Retry save';
         this.plugin.reportSaveError(error);
       });
     }, 'mod-cta vg-save');
@@ -604,10 +689,10 @@ export class GalleryView extends ItemView {
         nameInput.focus();
         return;
       }
-      const draftTags = tags.value;
+      const draftTags = tags.getTags();
       const draftDescription = description.value;
       rename.disabled = true; save.disabled = true; nameInput.disabled = true;
-      tags.disabled = true; description.disabled = true;
+      tags.setDisabled(true); description.disabled = true;
       rename.textContent = 'Renaming…';
       this.renaming = true;
       try {
@@ -616,9 +701,8 @@ export class GalleryView extends ItemView {
         this.refresh();
         if (this.filtered.some(item => item.path === newPath)) {
           this.select(newPath);
-          const newTags = this.preview.querySelector<HTMLInputElement>('.vg-field input:not(.vg-filename)');
           const newDescription = this.preview.querySelector<HTMLTextAreaElement>('textarea');
-          if (newTags) newTags.value = draftTags;
+          this.tagEditor?.setTags(draftTags);
           if (newDescription) newDescription.value = draftDescription;
         }
         new Notice('File renamed.');
@@ -626,14 +710,161 @@ export class GalleryView extends ItemView {
         console.error('Media Hub rename failed', error);
         renameStatus.textContent = error instanceof Error ? error.message : 'Could not rename this file.';
         rename.disabled = false; save.disabled = false; nameInput.disabled = false;
-        tags.disabled = false; description.disabled = false;
+        tags.setDisabled(false); description.disabled = false;
         rename.textContent = 'Rename file';
       } finally { this.renaming = false; }
     };
-    const markDirty = () => { save.textContent = 'Save details'; };
-    tags.addEventListener('input', markDirty); description.addEventListener('input', markDirty);
+    markDirty = () => { save.textContent = 'Save details'; };
+    description.addEventListener('input', markDirty);
     button(inspector, 'Open in Obsidian', 'external-link', () => { void this.openFile(file); }, 'vg-open-file');
     this.preview.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  private knownTags(): string[] {
+    return [...new Set(this.files.flatMap(file => getMetadata(this.plugin.data, file.path).tags))];
+  }
+
+  private syncSelection(): void {
+    if (!this.selectionBar) return;
+    for (const card of Array.from(this.grid.querySelectorAll<HTMLElement>('.vg-card'))) {
+      const selected = this.selectedPaths.has(card.dataset.path || '');
+      card.dataset.selected = String(selected);
+      const checkbox = card.querySelector<HTMLInputElement>('.vg-select-checkbox');
+      if (checkbox) checkbox.checked = selected;
+    }
+    this.selectionBar.replaceChildren();
+    this.selectionBar.hidden = !this.selectedPaths.size;
+    if (!this.selectedPaths.size) return;
+    const paths = [...this.selectedPaths];
+    const count = el(this.selectionBar, 'strong', '', `${paths.length} selected`);
+    count.setAttribute('role', 'status');
+    button(this.selectionBar, 'Clear selection', null, () => {
+      this.selectedPaths.clear(); this.selectionAnchor = null; this.syncSelection();
+    }, 'vg-text-button');
+    button(this.selectionBar, 'Add tags', null, () => this.openTagsDialog(paths));
+    button(this.selectionBar, 'Add to collection', null, () => this.openCollectionDialog(paths));
+    if (this.filters.collection) {
+      const collectionId = this.filters.collection;
+      const remove = button(this.selectionBar, 'Remove from collection', null, () => {
+        remove.disabled = true;
+        void this.plugin.mutateData(data => {
+          const collection = data.collections.find(item => item.id === collectionId);
+          if (!collection) throw new Error('The collection no longer exists.');
+          const selected = new Set(paths);
+          collection.paths = collection.paths.filter(path => !selected.has(path));
+        }).catch(error => { remove.disabled = false; this.plugin.reportSaveError(error); });
+      });
+    }
+    button(this.selectionBar, 'Delete files', null, () => this.openDeleteDialog(paths), 'vg-delete-button');
+  }
+
+  private openTagsDialog(paths: readonly string[]): void {
+    new GalleryActionModal(this.app, `Add tags to ${paths.length} files`, (body, close) => {
+      el(body, 'p', 'vg-setting-hint', 'These tags will be added to every selected file. Existing tags and descriptions are preserved.');
+      const editor = new TagEditor(body, [], () => this.knownTags(), undefined, 'Tags to add');
+      const status = el(body, 'p', 'vg-setting-hint'); status.setAttribute('role', 'status');
+      const actions = el(body, 'div', 'vg-modal-actions');
+      const cancel = button(actions, 'Cancel', null, close);
+      const apply = button(actions, 'Apply tags', null, () => {
+        const tags = editor.getTags();
+        if (!tags.length) { status.textContent = 'Add at least one tag.'; return; }
+        apply.disabled = true; cancel.disabled = true; editor.setDisabled(true);
+        void this.plugin.mutateData(data => {
+          const available = new Set(this.app.vault.getFiles().map(file => file.path));
+          for (const path of paths) {
+            if (!available.has(path)) continue;
+            const previous = getMetadata(data, path);
+            data.metadata[path] = { tags: parseTags([...previous.tags, ...tags].join(',')), description: previous.description };
+          }
+        }).then(() => {
+          if (this.selectedPath && paths.includes(this.selectedPath)) this.tagEditor?.addTags(tags);
+          close();
+        }).catch(error => {
+          status.textContent = 'Could not save tags. Try again.';
+          apply.disabled = false; cancel.disabled = false; editor.setDisabled(false);
+          this.plugin.reportSaveError(error);
+        });
+      }, 'mod-cta');
+    }).open();
+  }
+
+  private openCollectionDialog(paths: readonly string[]): void {
+    new GalleryActionModal(this.app, paths.length ? `Add ${paths.length} files to a collection` : 'Create collection', (body, close) => {
+      el(body, 'p', 'vg-setting-hint', 'Collections group files without moving or copying them. A file can belong to several collections.');
+      let existing: HTMLSelectElement | null = null;
+      if (paths.length) {
+        const label = el(body, 'label', 'vg-setting-field'); el(label, 'span', '', 'Collection');
+        existing = el(label, 'select'); existing.setAttribute('aria-label', 'Choose collection');
+        const option = el(existing, 'option', '', 'Create a new collection'); option.value = '';
+        for (const collection of [...this.plugin.data.collections].sort((a, b) => a.name.localeCompare(b.name))) {
+          const option = el(existing, 'option', '', collection.name); option.value = collection.id;
+        }
+      }
+      const label = el(body, 'label', 'vg-setting-field'); el(label, 'span', '', 'New collection name');
+      const name = el(label, 'input'); name.type = 'text'; name.placeholder = 'Travel'; name.setAttribute('aria-label', 'New collection name');
+      existing?.addEventListener('change', () => { name.disabled = Boolean(existing?.value); });
+      const status = el(body, 'p', 'vg-setting-hint'); status.setAttribute('role', 'status');
+      const actions = el(body, 'div', 'vg-modal-actions');
+      const cancel = button(actions, 'Cancel', null, close);
+      const submit = button(actions, paths.length ? 'Add to collection' : 'Create collection', null, () => {
+        const existingId = existing?.value || '';
+        const newName = name.value.trim();
+        if (!existingId && !newName) { status.textContent = 'Enter a collection name.'; return; }
+        let targetId = existingId;
+        submit.disabled = true; cancel.disabled = true; name.disabled = true;
+        if (existing) existing.disabled = true;
+        void this.plugin.mutateData(data => {
+          const available = new Set(this.app.vault.getFiles().map(file => file.path));
+          const members = paths.filter(path => available.has(path));
+          if (paths.length && !members.length) throw new Error('The selected files are no longer available.');
+          if (existingId) {
+            const collection = data.collections.find(item => item.id === existingId);
+            if (!collection) throw new Error('The collection no longer exists.');
+            collection.paths = [...new Set([...collection.paths, ...members])];
+          } else targetId = createCollection(data, newName, members).id;
+        }).then(() => {
+          if (!paths.length) { this.filters.collection = targetId; this.filters.folder = null; this.refresh(); }
+          close();
+        }).catch(error => {
+          status.textContent = error instanceof Error ? error.message : 'Could not save collection.';
+          submit.disabled = false; cancel.disabled = false; name.disabled = Boolean(existingId);
+          if (existing) existing.disabled = false;
+        });
+      }, 'mod-cta');
+      name.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); submit.click(); } });
+    }).open();
+  }
+
+  private openDeleteDialog(paths: readonly string[]): void {
+    const files = this.app.vault.getFiles();
+    const targets = paths.flatMap(path => {
+      const file = files.find(item => item.path === path);
+      return file && mediaKind(file.extension) ? [{ file, path }] : [];
+    });
+    if (!targets.length) return;
+    const noun = targets.length === 1 ? 'file' : 'files';
+    new GalleryActionModal(this.app, `Delete ${targets.length} ${noun} from the vault?`, (body, close) => {
+      el(body, 'p', 'vg-setting-hint', `The following ${targets.length} ${noun} will be removed from the vault and all collections, using your configured trash location. Removing files from a collection alone does not delete them.`);
+      const list = el(body, 'ul', 'vg-delete-list');
+      for (const target of targets) el(list, 'li', '', target.path);
+      const status = el(body, 'p', 'vg-setting-hint'); status.setAttribute('role', 'status');
+      const actions = el(body, 'div', 'vg-modal-actions');
+      const cancel = button(actions, 'Cancel', null, close);
+      const confirm = button(actions, `Move ${targets.length} ${noun} to trash`, null, () => {
+        confirm.disabled = true; cancel.disabled = true; status.textContent = 'Moving files to trash…';
+        void this.plugin.trashMedia(targets).then(result => {
+          for (const path of result.deleted) this.selectedPaths.delete(path);
+          this.syncSelection();
+          if (result.failed.length) {
+            status.textContent = `${result.deleted.length} moved to trash. Could not delete ${result.failed.length} files; they may have changed or be unwritable.`;
+            confirm.hidden = true; cancel.disabled = false; cancel.textContent = 'Close';
+          } else close();
+        }).catch(error => {
+          console.error(error); status.textContent = 'Could not complete deletion. Check the files before trying again.';
+          confirm.disabled = false; cancel.disabled = false;
+        });
+      }, 'mod-warning');
+    }).open();
   }
 
   private renderUnavailable(parent: HTMLElement, message: string): void {

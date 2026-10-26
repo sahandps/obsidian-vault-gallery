@@ -1,6 +1,6 @@
 {
   "name": "obsidian-vault-gallery",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A visual home for media in your Obsidian vault.",
   "private": true,
   "type": "module",

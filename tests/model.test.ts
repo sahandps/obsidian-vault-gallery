@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filterMedia, getMetadata, mediaKind, moveMetadata, normalizeImportFolder, importPath, parseTags, removeMetadata, renamedPath, sanitizeData, type Filters, type MediaFile } from '../src/model';
+import { createCollection, filterMedia, getMetadata, mediaKind, moveMetadata, normalizeImportFolder, importPath, parseTags, removeMetadata, renamedPath, sanitizeData, type Filters, type MediaFile } from '../src/model';
 const file = (path: string, size = 100, mtime = 10): MediaFile => ({ path, name: path.split('/').pop()!, extension: path.split('.').pop()!, stat: { ctime: 1, mtime, size } });
 const filters: Filters = { query: '', kind: 'all', folder: null, tag: '', sort: 'newest' };
 test('discovers media without treating arbitrary files as media', () => {
@@ -70,4 +70,20 @@ test('import settings migrate old data without losing tags and reject paths outs
   assert.equal(importPath('', 'a.png'), 'a.png');
   assert.throws(() => importPath('Media', '../a.png'));
   assert.throws(() => importPath('Media', 'note.md'));
+});
+
+
+test('collections migrate, filter independently of folders, and follow file/folder lifecycle', () => {
+  const data = sanitizeData(null); const first = createCollection(data, 'Travel', ['Art/a.jpg', 'Art/a.jpg', 'Artist/b.jpg']);
+  assert.deepEqual(first.paths, ['Art/a.jpg', 'Artist/b.jpg']);
+  assert.throws(() => createCollection(data, ' travel ')); assert.throws(() => createCollection(data, ' '));
+  createCollection(data, 'Other', ['Art/a.jpg']);
+  assert.deepEqual(filterMedia([file('Art/a.jpg'), file('Artist/b.jpg'), file('outside.jpg')], data, { ...filters, collection: first.id }).map(f => f.path), ['Art/a.jpg', 'Artist/b.jpg']);
+  moveMetadata(data, 'Art', 'Archive');
+  assert.deepEqual(first.paths, ['Archive/a.jpg', 'Artist/b.jpg']);
+  removeMetadata(data, 'Archive');
+  assert.deepEqual(first.paths, ['Artist/b.jpg']); assert.deepEqual(data.collections[1].paths, []);
+  const copy = sanitizeData(data); copy.collections[0].paths.push('other.png');
+  assert.deepEqual(data.collections[0].paths, ['Artist/b.jpg']);
+  assert.deepEqual(filterMedia([file('outside.jpg')], data, { ...filters, collection: 'missing' }), []);
 });

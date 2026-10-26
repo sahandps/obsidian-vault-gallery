@@ -11,6 +11,7 @@ export class ItemView {
       for (const key of ['type', 'value', 'placeholder'] as const) if (options[key] !== undefined) element.setAttribute(key, options[key]!);
       this.appendChild(element); return element;
     } as typeof prototype.createEl;
+    prototype.createDiv = function(options = {}) { return this.createEl('div', options); };
     prototype.createSpan = function(options = {}) { return this.createEl('span', options); };
     prototype.setCssProps = function(this: HTMLElement, props: Record<string, string>) {
       for (const [key, value] of Object.entries(props)) this.style.setProperty(key, value);
@@ -41,16 +42,17 @@ export class PluginSettingTab {
   display() {}
 }
 export class Modal {
+  modalEl: HTMLElement;
   containerEl: HTMLElement;
   contentEl: HTMLElement;
   titleEl: HTMLElement;
   constructor(public app: any) {
     this.containerEl = app.doc.createElement('div'); this.containerEl.className = 'preview-modal-backdrop';
-    const modal = app.doc.createElement('section'); modal.className = 'preview-modal';
+    const modal = app.doc.createElement('section'); modal.className = 'preview-modal'; this.modalEl = modal;
     modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-label', 'Gallery settings');
     this.containerEl.appendChild(modal);
     const close = app.doc.createElement('button'); close.textContent = 'Close'; close.className = 'preview-modal-close';
-    close.setAttribute('aria-label', 'Close settings'); close.onclick = () => this.close(); modal.appendChild(close);
+    close.setAttribute('aria-label', 'Close dialog'); close.onclick = () => this.close(); modal.appendChild(close);
     this.titleEl = app.doc.createElement('h2'); modal.appendChild(this.titleEl);
     this.contentEl = app.doc.createElement('div'); modal.appendChild(this.contentEl);
     this.containerEl.addEventListener('click', event => { if (event.target === this.containerEl) this.close(); });
