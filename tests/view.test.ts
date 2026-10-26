@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import { resolve } from 'node:path';
 
-const bundle = await build({ stdin: { contents: "export {default} from './src/main'; export {TFolder as MockFolder} from './tests/obsidian-mock';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', write: false, alias: { obsidian: resolve('tests/obsidian-mock.ts') } });
+const bundle = await build({ stdin: { contents: "export {default} from './src/main'; export {TFolder as MockFolder, Platform as MockPlatform, CapacitorAdapter as MockCapacitorAdapter} from './tests/obsidian-mock';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', write: false, alias: { obsidian: resolve('tests/obsidian-mock.ts') } });
 const module = { exports: {} as any };
 new Function('module', 'exports', bundle.outputFiles[0].text)(module, module.exports);
 const GalleryPlugin = module.exports.default;
@@ -363,16 +363,11 @@ test('Save details leaves file and details unchanged if filename is invalid', as
   assert.match(doc.querySelector('.vg-rename-status')!.textContent!, /cannot contain/);
   await view.onClose();
 });
-test('download prepares a copy and native sharing uses the prepared bytes without deleting', async () => {
-  const { doc, dom, view, click, trashed } = await setup();
-  let shared: any;
-  Object.defineProperty(dom.window.navigator, 'canShare', { value: () => true });
-  Object.defineProperty(dom.window.navigator, 'share', { value: async (data: any) => { shared = data; } });
+test('download has no Share button and prepares original-file copies', async () => {
+  const { doc, view, click, trashed } = await setup();
   click('Preview photo.jpg'); click('Download'); await tick();
   assert.equal(doc.querySelector<HTMLButtonElement>('[aria-label="Save to device"]')!.disabled, false);
-  click('Share / Save to Files'); await tick();
-  assert.equal(shared.files[0].name, 'photo.jpg');
-  assert.deepEqual([...new Uint8Array(await shared.files[0].arrayBuffer())], [1, 2, 3]);
+  assert.equal(doc.querySelector('[aria-label="Share / Save to Files"]'), null);
   assert.deepEqual(trashed, []);
   await view.onClose();
 });
@@ -383,4 +378,38 @@ test('download reports read errors and never offers incomplete output', async ()
   assert.match(doc.querySelector('.vg-action-modal')!.textContent!, /Unreadable media/);
   assert.equal(doc.querySelector<HTMLButtonElement>('[aria-label="Save to device"]')!.disabled, true);
   await view.onClose();
+});
+
+test('checked media does not block previous/next buttons or keyboard arrows from a checkbox', async () => {
+  const { doc, dom, view, click } = await setup();
+  click('Preview book.pdf');
+  const checkbox = doc.querySelector<HTMLInputElement>('[aria-label="Select book.pdf"]')!;
+  checkbox.click(); checkbox.focus();
+  checkbox.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+  assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value, 'clip');
+  assert.equal(checkbox.checked, true);
+  click('Next media');
+  assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value, 'music');
+  click('Previous media');
+  assert.equal(doc.querySelector<HTMLInputElement>('[aria-label="File name"]')!.value, 'clip');
+  assert.equal(checkbox.checked, true);
+  await view.onClose();
+});
+
+
+test('Android Download uses native Documents copies instead of browser downloads or sharing', async () => {
+  const { doc, dom, plugin, view, click } = await setup();
+  const copied: any[] = [];
+  (dom.window as any).Capacitor = { Plugins: { Filesystem: { mkdir: async () => {}, copy: async (options: any) => { copied.push(options); } } } };
+  plugin.app.vault.adapter = new module.exports.MockCapacitorAdapter();
+  plugin.app.vault.readBinary = async () => { throw new Error('Android should copy natively'); };
+  module.exports.MockPlatform.isAndroidApp = true;
+  try {
+    click('Select all'); click('Download'); await tick();
+    assert.equal(doc.querySelector('[aria-label="Share / Save to Files"]'), null);
+    click('Save to device'); await tick();
+    assert.equal(copied.length, 5);
+    assert.equal(copied[0].toDirectory, 'DOCUMENTS');
+    assert.match(doc.querySelector('.vg-action-modal')!.textContent!, /Saved 5 of 5/);
+  } finally { module.exports.MockPlatform.isAndroidApp = false; await view.onClose(); }
 });

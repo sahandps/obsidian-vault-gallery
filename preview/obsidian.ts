@@ -74,3 +74,6 @@ export function setIcon(node: HTMLElement, name: string) {
   const icon = (icons as Record<string, IconNode>)[key];
   if (icon) node.replaceChildren(createElement(icon));
 }
+
+export const Platform = { isAndroidApp: false };
+export class CapacitorAdapter { getFullPath(path: string): string { return `/vault/${path}`; } }

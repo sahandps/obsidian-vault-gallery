@@ -1,16 +1,18 @@
-Media Hub 0.3.1 fixes filename saving and adds original-file downloads.
+Media Hub 0.3.2 adds direct Android saves and improves navigation with checked media.
 
-Editing **File name** and clicking **Save details** now applies the rename along with tags and description. **Rename file** and Enter remain available. Invalid names and collisions show an error without saving details to the wrong path.
+**Download on Android** now copies the selected original files into a new folder inside **Documents/Media Hub**, rather than relying on browser download links. The dialog reports the exact destination and any failed files. Each download creates a new folder; duplicate names receive numbered suffixes. Older Android versions may ask for storage permission. If Obsidian does not expose the required native file bridge, the dialog reports that saving is unavailable.
 
-Use **Download** in the selection toolbar or file preview to save copies on your device. Multiple files stay separate in their original formats—no ZIP archive. Use individual save buttons if your device blocks bulk downloads. Where supported, **Share / Save to Files** opens the native share sheet. Actual save destinations depend on the device; mobile functionality still requires device testing. Exports are prepared in memory and limited to 512 MB per selection.
+The **Share** button and all sharing behavior have been removed. Desktop downloads still save individual original files, with no ZIP archive. Vault originals remain unchanged. This Android path has automated tests with a mocked native bridge; physical-device verification is still needed.
 
-Requires Obsidian **1.7.2+**. Existing vault files are preserved by downloading. Licensed under **GPL-3.0-only**.
+Preview navigation now accepts left/right keys while checkboxes have focus, keeps arrow-button focus, and avoids scrolling the preview again on every previous/next action. Checked files remain selected while browsing.
+
+Requires Obsidian **1.7.2+**. Licensed under **GPL-3.0-only**.
 
 [Buy me a coffee](https://buymeacoffee.com/sahandprs)
 
 ### Updates
 
-- Apply filename edits through Save details, preserving tags and descriptions.
-- Download original media from previews or multiple selections without archives.
-- Offer individual saves and supported native sharing.
-- Add tests for original bytes, filenames, combined rename/save, and read failures.
+- Direct Android copies to Documents/Media Hub with destination and failure reporting.
+- Remove Share button and native sharing calls.
+- Improve checked-media preview navigation and focus handling.
+- Add permission, duplicate-name, partial-failure, and navigation regression tests.

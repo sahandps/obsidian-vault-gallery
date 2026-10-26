@@ -20,7 +20,7 @@ Choose a default folder for added media from the gallery's gear button or **Sett
 
 ![Download selected files in their original formats](docs/images/downloads.jpg)
 
-Save media copies to your device from the selection toolbar or expanded preview. Each file keeps its original format. Individual save buttons and supported native sharing give you control over where copies go.
+Save media copies to your device from the selection toolbar or expanded preview. Each file keeps its original format. On desktop, use individual save buttons or save the selection. On Android, save directly into a new folder inside Documents/Media Hub; the dialog reports the destination and any failed copies.
 
 ## Manual installation
 
@@ -54,7 +54,7 @@ Use a test vault for your first run. This plugin has automated tests but has not
 - **Tag chips:** type a tag and press Enter or comma; remove a chip with ×. Existing tags appear as suggestions, with mouse or arrow-key selection. Click **Save details** before switching files. Tags are normalized to lowercase and deduplicated.
 - **Multiple selection:** check media cards, Shift-click for a range, or use **Select all** for all matching files, including cards not yet loaded. Changing filters clears selections that are no longer visible. Bulk **Add tags** preserves existing tags and descriptions.
 - **Collections:** create a group with the + beside Collections, or select files and use **Add to collection** to choose an existing group or create one. Membership follows renames and folder moves observed while the plugin is running.
-- **Download:** save original files from the selection toolbar or preview. Multiple files remain separate, with individual save buttons if your device blocks bulk downloads. Where supported, **Share / Save to Files** opens the native share sheet. Available destinations and download support depend on the device; mobile behavior requires device testing. Files remain in the vault. Exports are prepared in memory and limited to 512 MB per selection.
+- **Download:** save original files from the selection toolbar or preview. Multiple files remain separate, with individual save buttons if your device blocks bulk downloads. On Android, the button copies files directly to a new folder inside **Documents/Media Hub**, using the native file bridge supplied by Obsidian. Each download creates a unique folder, and duplicate filenames get numbered suffixes. Storage permission may be requested on older Android versions. Missing native support, permission denial, and partial failures are reported. The Share button has been removed. Files remain in the vault. Desktop exports are prepared in memory and limited to 512 MB per selection. Android uses native file copies; this path has automated bridge tests but still needs verification on a physical device. iOS device saving remains unverified.
 - **Deletion:** **Remove from collection** keeps files in the vault and other collections. **Delete files** confirms the selected count and exact file paths before using Obsidian’s trash handling. Files renamed or replaced after confirmation are skipped; failures are reported.
 - Previous/next buttons and left/right arrow navigation; Escape closes the preview when outside a form or player.
 - Opens the original file in a separate Obsidian tab. PDFs open in Obsidian's reader.
@@ -104,6 +104,13 @@ Copyright © 2026 Sahand (sahandps). Licensed under the [GNU General Public Lice
 If Media Hub is useful to you, you can [buy me a coffee](https://buymeacoffee.com/sahandprs).
 
 ## Updates
+
+### 0.3.2
+
+- Replace browser downloads on Android with direct native copies to Documents/Media Hub.
+- Remove the Share button and sharing behavior.
+- Keep preview navigation working from focused checkboxes, retain arrow-button focus, and avoid repeated scrolling during navigation.
+- Add Android permission, copy, partial-failure, and checked-media navigation tests.
 
 ### 0.3.1
 

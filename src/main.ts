@@ -1,12 +1,13 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
 
-import { ItemView, Notice, Plugin, TFile, TFolder, WorkspaceLeaf, setIcon } from 'obsidian';
+import { ItemView, Notice, Plugin, Platform, CapacitorAdapter, TFile, TFolder, WorkspaceLeaf, setIcon } from 'obsidian';
 import {
   createCollection, filterMedia, formatSize, getMetadata, importPath, mediaAccept, mediaKind, normalizeImportFolder, moveMetadata, parseTags,
   removeMetadata, renamedPath, sanitizeData, type Filters, type GalleryData, type MediaKind, type SortOrder,
 } from './model';
 
+import { androidFilesystem, saveAndroidFiles } from './android-download';
 import { EXPORT_LIMIT, exportPayload } from './export-media';
 import { TagEditor } from './tag-editor';
 import { GalleryActionModal } from './action-modal';
@@ -353,10 +354,10 @@ export class GalleryView extends ItemView {
     this.applySettings();
     this.registerDomEvent(root, 'keydown', event => {
       const target = event.target as HTMLElement;
-      if (target.matches('input, textarea, select, [contenteditable="true"], video, audio')) return;
+      if (target.matches('input:not([type="checkbox"]), textarea, select, [contenteditable="true"], video, audio')) return;
       if (event.key === 'Escape') { this.select(null); event.preventDefault(); }
       if (this.selectedPath && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
-        this.navigate(event.key === 'ArrowLeft' ? -1 : 1); event.preventDefault();
+        this.navigate(event.key === 'ArrowLeft' ? -1 : 1); event.preventDefault(); event.stopPropagation();
       }
     });
     this.refresh();
@@ -563,7 +564,7 @@ export class GalleryView extends ItemView {
     el(info, 'div', 'vg-card-subtitle', meta.tags.length ? meta.tags.map(tag => `#${tag}`).join('  ') : `${formatSize(file.stat.size)} · ${file.parent?.path === '/' ? 'Vault root' : file.parent?.path || 'Vault root'}`);
   }
 
-  private select(path: string | null): void {
+  private select(path: string | null, scrollToPreview = true): void {
     stopMedia(this.preview);
     this.selectedPath = path;
     this.tagEditor = null;
@@ -726,7 +727,7 @@ export class GalleryView extends ItemView {
     description.addEventListener('input', markDirty);
     button(inspector, 'Download', 'download', () => this.openDownloadDialog([file.path]), 'vg-open-file');
     button(inspector, 'Open in Obsidian', 'external-link', () => { void this.openFile(file); }, 'vg-open-file');
-    this.preview.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    if (scrollToPreview) this.preview.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }
 
   private knownTags(): string[] {
@@ -853,6 +854,27 @@ export class GalleryView extends ItemView {
       const download = button(actions, 'Save to device', null, () => {}, 'mod-cta'); download.disabled = true;
       const owner = body.ownerDocument.defaultView;
       if (!owner) return;
+      if (Platform.isAndroidApp) {
+        const fs = androidFilesystem(owner);
+        const adapter = this.app.vault.adapter;
+        if (!fs || !(adapter instanceof CapacitorAdapter)) {
+          status.textContent = 'Direct saving is unavailable in this version of Obsidian. Update Obsidian and try again.';
+          return;
+        }
+        status.textContent = 'Each download saves original files in a new folder at: Documents/Media Hub.';
+        download.disabled = false;
+        download.addEventListener('click', () => {
+          download.disabled = true;
+          status.textContent = 'Saving files…';
+          const targets = paths.map(path => ({ path, source: adapter.getFullPath(path) }));
+          void saveAndroidFiles(fs, targets).then(result => {
+            status.textContent = `Saved ${result.saved.length} of ${paths.length} files to Documents/${result.folder}.${result.failed.length ? ` Could not save: ${result.failed.join(', ')}` : ''}`;
+          }).catch((error: unknown) => {
+            status.textContent = error instanceof Error ? error.message : 'Could not save files to Documents.';
+          }).finally(() => { download.disabled = false; });
+        });
+        return;
+      }
       const prepare = async () => {
         const files = this.app.vault.getFiles();
         const selected = paths.map(path => {
@@ -873,15 +895,6 @@ export class GalleryView extends ItemView {
         const payload = exportPayload(entries);
         if (!body.isConnected) return;
         const copies = payload;
-        const nav = owner.navigator;
-        const share = button(actions, 'Share / Save to Files', null, () => {
-          // Keep the native share call inside this fresh user gesture.
-          share.disabled = true;
-          void nav.share({ files: copies }).then(() => { status.textContent = 'Handed to your device’s share sheet.'; }).catch((error: unknown) => {
-            status.textContent = error instanceof Error && error.name === 'AbortError' ? 'Sharing cancelled. Your vault files are unchanged.' : 'Sharing is unavailable. Try Save to device instead.';
-          }).finally(() => { share.disabled = false; });
-        });
-        share.hidden = !(typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: copies }));
         const saveCopy = (copy: File) => {
           const url = URL.createObjectURL(copy);
           const link = body.createEl('a', { text: copy.name });
@@ -900,7 +913,7 @@ export class GalleryView extends ItemView {
             button(row, `Save ${copy.name}`, 'download', () => saveCopy(copy));
           }
         }
-        status.textContent = share.hidden ? `${copies.length} ${copies.length === 1 ? 'file' : 'files'} ready. Save support depends on your device.` : `${copies.length} ${copies.length === 1 ? 'file' : 'files'} ready. Use the share sheet to choose Save to Files or another destination.`;
+        status.textContent = `${copies.length} ${copies.length === 1 ? 'file' : 'files'} ready to download.`;
       };
       void prepare().catch((error: unknown) => { status.textContent = error instanceof Error ? error.message : 'Could not prepare download.'; });
     }).open();
@@ -957,6 +970,11 @@ export class GalleryView extends ItemView {
   private navigate(direction: number): void {
     const index = this.filtered.findIndex(file => file.path === this.selectedPath);
     const file = this.filtered[index + direction];
-    if (file) this.select(file.path);
+    if (file) {
+      const focused = this.contentEl.ownerDocument.activeElement;
+      const navigationFocused = focused?.closest('.vg-preview-tools');
+      this.select(file.path, false);
+      if (navigationFocused) this.preview.querySelector<HTMLButtonElement>(`[aria-label="${direction < 0 ? 'Previous media' : 'Next media'}"]`)?.focus();
+    }
   }
 }

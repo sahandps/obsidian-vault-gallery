@@ -64,3 +64,6 @@ export class Modal {
   onClose() {}
 }
 export function setIcon(node: HTMLElement, name: string) { node.setAttribute('data-icon', name); }
+
+export const Platform = { isAndroidApp: false };
+export class CapacitorAdapter { getFullPath(path: string): string { return `/vault/${path}`; } }
