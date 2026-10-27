@@ -1,12 +1,12 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
 import { Notice, type App, type TFile } from 'obsidian';
-import { getMetadata } from '../../../backend/data/metadata';
-import { formatSize, renamedPath } from '../../../backend/media/file-names';
-import type { MediaKind } from '../../../backend/media/media-kinds';
-import type MediaHubPlugin from '../../../plugin';
-import { TagEditor } from '../../components/tag-editor';
-import { button, el } from '../../dom';
+import { getMetadata } from '../../backend/data/metadata';
+import { formatSize, renamedPath } from '../../backend/media/file-names';
+import type { MediaKind } from '../../backend/media/media-kinds';
+import type MediaHubPlugin from '../../plugin';
+import { TagEditor } from '../components/tag-editor';
+import { button, el } from '../dom';
 
 export interface InspectorDraft { tags: string[]; description: string }
 export interface InspectorHost {

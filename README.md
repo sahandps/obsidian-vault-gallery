@@ -52,7 +52,8 @@ Use a test vault for your first run. This plugin has automated tests but has not
 - Search across paths, tags, and descriptions. Every search word must match.
 - Tag filter and sorting by modified date, name, or file size.
 - Adjustable thumbnail sizes, saved across sessions.
-- Expanded image/GIF preview with zoom, and video/audio playback controls.
+- **Full-screen viewer:** selecting a file opens it full screen, growing out of its thumbnail. Swipe or use the arrow keys to move between files, pinch or double-tap to zoom (mouse wheel and `+`/`-` on desktop), drag down or press Escape to close, and tap the picture to hide the controls. The details panel (`i`) is a side drawer on desktop and a bottom sheet on phones. Video and audio play with their native controls. Gesture feel on real phones still needs device testing.
+- **Thumbnail cache:** large images are shrunk to small copies stored on this device (IndexedDB, not in your vault), so the grid scrolls smoothly. Formats the device cannot decode use the original file.
 - Editable filename in the details panel: change the name and click **Rename file**, press Enter, or use **Save details** to apply the name together with tags and description. The extension and folder stay the same. Duplicate and invalid names are rejected. Obsidian manages updates to linked notes according to your vault settings. Gallery tags and unsaved detail edits stay attached when you rename from this panel.
 - File path, format, size, file-system dates, image dimensions, or playback duration in the details panel.
 - **Tag chips:** type a tag and press Enter or comma; remove a chip with ×. Existing tags appear as suggestions, with mouse or arrow-key selection. Click **Save details** before switching files. Tags are normalized to lowercase and deduplicated.

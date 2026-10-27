@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
-import { button, el } from '../../dom';
+import { button, el } from '../dom';
 
 export interface ToolbarActions {
   previous: () => void;
@@ -11,7 +11,7 @@ export interface ToolbarActions {
 }
 
 /** Previous/next, position counter, zoom and close buttons above the preview. */
-export class PreviewToolbar {
+export class LightboxToolbar {
   private previous: HTMLButtonElement;
   private next: HTMLButtonElement;
   private position: HTMLElement;

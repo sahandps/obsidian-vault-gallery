@@ -10,12 +10,12 @@ import { openCollectionDialog } from './dialogs/collection-dialog';
 import { openDeleteDialog } from './dialogs/delete-dialog';
 import { openDownloadDialog } from './dialogs/download-dialog';
 import { openTagsDialog } from './dialogs/tags-dialog';
+import { Lightbox } from './lightbox/lightbox';
 import { el, stopMedia } from './dom';
 import { FilterBar } from './panels/filter-bar';
 import { FolderSidebar } from './panels/folder-sidebar';
 import { GalleryHeader } from './panels/gallery-header';
 import { MediaGrid } from './panels/media-grid';
-import { PreviewPanel } from './panels/preview/preview-panel';
 import { ResultsHeading } from './panels/results-heading';
 import { SelectionBar } from './panels/selection-bar';
 import { SelectionState } from './selection-state';
@@ -35,7 +35,7 @@ export class GalleryView extends ItemView {
   private filterBar!: FilterBar;
   private results!: ResultsHeading;
   private selectionBar!: SelectionBar;
-  private preview!: PreviewPanel;
+  private preview!: Lightbox;
   private grid!: MediaGrid;
 
   constructor(leaf: WorkspaceLeaf, private plugin: MediaHubPlugin) { super(leaf); }
@@ -62,7 +62,7 @@ export class GalleryView extends ItemView {
       toggleSelectAll: () => this.toggleSelectAll(),
     });
     this.selectionBar = new SelectionBar(scroll, this.selectionBarHost());
-    this.preview = new PreviewPanel(scroll, this.previewHost());
+    this.preview = new Lightbox(this.contentEl.ownerDocument, this.previewHost());
     this.grid = new MediaGrid(scroll, this.gridHost());
     this.filters.sort = this.plugin.data.defaultSort;
     this.filterBar.setSort(this.filters.sort);
@@ -72,6 +72,7 @@ export class GalleryView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.preview?.dispose();
     this.grid?.dispose();
     stopMedia(this.contentEl);
     this.contentEl.replaceChildren();
@@ -155,14 +156,13 @@ export class GalleryView extends ItemView {
     this.selectionBar.render(this.selection.toArray(), Boolean(this.filters.collection));
   }
 
-  private select(path: string | null, scrollToPreview = true): void {
+  private select(path: string | null): void {
     this.selectedPath = path;
     this.grid.markPreviewed(path);
     if (!path) { this.preview.hide(); return; }
     const file = this.files.find(item => item.path === path);
     if (!file) { this.selectedPath = null; this.preview.hide(); return; }
     this.preview.show(file, this.filtered.indexOf(file), this.filtered.length);
-    if (scrollToPreview) this.preview.element.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   }
 
   private navigate(direction: number): void {
@@ -170,7 +170,7 @@ export class GalleryView extends ItemView {
     const file = this.filtered[index + direction];
     if (!file) return;
     const navigationFocused = this.contentEl.ownerDocument.activeElement?.closest('.vg-preview-tools');
-    this.select(file.path, false);
+    this.select(file.path);
     if (navigationFocused) this.preview.focusNavigation(direction);
   }
 
@@ -273,6 +273,11 @@ export class GalleryView extends ItemView {
       renameFile: (file: TFile, newPath: string, draft: { tags: string[]; description: string }) => this.renameFile(file, newPath, draft),
       previous: () => this.navigate(-1),
       next: () => this.navigate(1),
+      neighbors: () => {
+        const index = this.filtered.findIndex(file => file.path === this.selectedPath);
+        return { previous: this.filtered[index - 1], next: this.filtered[index + 1] };
+      },
+      originImage: (path: string) => this.grid.thumbnailImage(path),
       close: () => {
         const path = this.selectedPath;
         this.select(null);

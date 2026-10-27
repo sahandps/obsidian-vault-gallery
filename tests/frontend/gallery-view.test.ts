@@ -69,7 +69,7 @@ test('gallery filters, opens preview, saves tags, reopens saved details, and ope
   assert.equal(doc.querySelector('video')?.autoplay, false);
   click('Images');
   click('Preview photo.jpg');
-  assert.equal(doc.querySelector('.vg-preview')?.hasAttribute('hidden'), false);
+  assert.equal(doc.querySelector('.vg-lightbox')?.hasAttribute('hidden'), false);
   const tags = doc.querySelector<HTMLInputElement>('.vg-inspector input:not(.vg-filename)')!;
   tags.value = '#Travel, travel, blue';
   click('Save details'); await tick();
@@ -84,7 +84,7 @@ test('gallery filters, opens preview, saves tags, reopens saved details, and ope
   const search = doc.querySelector<HTMLInputElement>('[aria-label="Search media"]')!;
   search.value = 'no-match'; search.dispatchEvent(new dom.window.Event('input'));
   assert.match(doc.querySelector('.vg-empty')!.textContent!, /No matching media/);
-  assert.equal(doc.querySelector('.vg-preview')?.hasAttribute('hidden'), true);
+  assert.equal(doc.querySelector('.vg-lightbox')?.hasAttribute('hidden'), true);
   click('Clear filters');
   assert.equal(doc.querySelectorAll('.vg-card').length, 5);
   await view.onClose();
@@ -102,7 +102,7 @@ test('renaming folders preserves tags and deleting removes stale tags and select
   click('Preview photo.jpg');
   files.shift(); listeners.get('delete')!({ path: 'Archive/photo.jpg' });
   view.refresh();
-  assert.equal(doc.querySelector('.vg-preview')?.hasAttribute('hidden'), true);
+  assert.equal(doc.querySelector('.vg-lightbox')?.hasAttribute('hidden'), true);
   assert.equal(plugin.data.metadata['Archive/photo.jpg'], undefined);
   plugin.onunload(); await view.onClose();
 });
@@ -268,12 +268,12 @@ test('checkbox selection supports ranges, bulk tags preserve descriptions, and f
   checkboxes[0].click();
   checkboxes[2].dispatchEvent(new dom.window.MouseEvent('click', { bubbles: true, shiftKey: true }));
   assert.equal(doc.querySelectorAll('.vg-select-checkbox:checked').length, 3);
-  assert.equal(doc.querySelector<HTMLElement>('.vg-preview')!.hidden, true);
+  assert.equal(doc.querySelector<HTMLElement>('.vg-lightbox')!.hidden, true);
   const paths = [...doc.querySelectorAll<HTMLElement>('.vg-card[data-selected="true"]')].map(card => card.dataset.path!);
   click('Add tags');
   const input = doc.querySelector<HTMLInputElement>('[aria-label="Tags to add"]')!;
   input.value = 'shared'; input.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-  const modal = doc.querySelector('[role="dialog"]')!;
+  const modal = doc.querySelector('[role="dialog"]:not(.vg-lightbox)')!;
   [...modal.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Apply tags')!.click(); await tick();
   for (const path of paths) assert.ok(plugin.stored.metadata[path].tags.includes('shared'));
   assert.equal(plugin.stored.metadata['Art/photo.jpg'].description, 'Keep this');
@@ -290,7 +290,7 @@ test('collections allow multiple membership; removing membership never deletes f
   const addCollection = async (name: string) => {
     click('Add to collection');
     doc.querySelector<HTMLInputElement>('[aria-label="New collection name"]')!.value = name;
-    const modal = doc.querySelector('[role="dialog"]')!;
+    const modal = doc.querySelector('[role="dialog"]:not(.vg-lightbox)')!;
     [...modal.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Add to collection')!.click(); await tick();
   };
   await addCollection('Travel'); await addCollection('References');
@@ -311,7 +311,7 @@ test('deletion requires explicit confirmation and reports partial trash failures
   plugin.data.collections.push({ id: 'one', name: 'Keep', paths: targets.map(f => f.path) });
   for (const target of targets) doc.querySelector<HTMLInputElement>(`[aria-label="Select ${target.name}"]`)!.click();
   click('Delete files');
-  assert.match(doc.querySelector('[role="dialog"]')!.textContent!, /Delete 2 files/);
+  assert.match(doc.querySelector('[role="dialog"]:not(.vg-lightbox)')!.textContent!, /Delete 2 files/);
   assert.deepEqual(trashed, []);
   [...doc.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button => button.textContent === 'Cancel')!.click();
   assert.equal(files.length, 5);
@@ -325,7 +325,7 @@ test('deletion requires explicit confirmation and reports partial trash failures
   assert.deepEqual(trashed, ['Art/photo.jpg']);
   assert.ok(files.includes(targets[1]));
   assert.deepEqual(plugin.data.collections[0].paths, ['video.mp4']);
-  assert.match(doc.querySelector('[role="dialog"]')!.textContent!, /Could not delete 1/);
+  assert.match(doc.querySelector('[role="dialog"]:not(.vg-lightbox)')!.textContent!, /Could not delete 1/);
   plugin.onunload(); await view.onClose();
 });
 
@@ -423,7 +423,7 @@ test('media tabs override checked selection and preview; select all toggles to d
   click('Select all'); click('Videos');
   assert.equal(doc.querySelectorAll('.vg-card').length, 1);
   assert.equal(doc.querySelectorAll('.vg-select-checkbox:checked').length, 0);
-  assert.equal(doc.querySelector<HTMLElement>('.vg-preview')!.hidden, true);
+  assert.equal(doc.querySelector<HTMLElement>('.vg-lightbox')!.hidden, true);
   assert.equal(doc.querySelector('[aria-label="Preview video.mp4"]') !== null, true);
   click('All media'); assert.equal(doc.querySelectorAll('.vg-card').length, 5);
   await view.onClose();
