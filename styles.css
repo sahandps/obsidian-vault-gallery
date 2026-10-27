@@ -167,6 +167,7 @@
 
 /* Lightbox: the full-screen viewer. */
 .vg-root.vg-lightbox { position: fixed; inset: 0; z-index: var(--layer-modal, 50); display: block; height: auto; padding: 0; overflow: hidden; background: transparent; color: #f2f2f0; overscroll-behavior: contain; }
+.vg-root.vg-lightbox[hidden] { display: none; }
 .vg-lightbox-backdrop { position: absolute; inset: 0; background: #0b0c0b; opacity: var(--vg-backdrop, 1); }
 .vg-lightbox-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
 .vg-track { position: absolute; inset: 0; --vg-drag: 0px; --vg-shift: 0; }
