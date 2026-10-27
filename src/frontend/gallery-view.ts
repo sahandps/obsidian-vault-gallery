@@ -251,6 +251,7 @@ export class GalleryView extends ItemView {
     return {
       app: this.app,
       data: () => this.plugin.data,
+      thumbnails: () => this.plugin.thumbnails,
       previewedPath: () => this.selectedPath,
       isChecked: (path: string) => this.selection.has(path),
       openPreview: (path: string) => this.select(path),

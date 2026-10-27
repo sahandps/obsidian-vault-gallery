@@ -1,5 +1,11 @@
 import { createElement, icons } from 'lucide';
 import type { IconNode } from 'lucide';
+// Obsidian's global element helper, used outside views.
+(globalThis as any).createEl = (tag: string, options: { cls?: string; text?: string } = {}) => {
+  const element = document.createElement(tag);
+  element.className = options.cls || ''; element.textContent = options.text || '';
+  return element;
+};
 export class ItemView {
   app: any;
   contentEl: HTMLElement;

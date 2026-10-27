@@ -5,6 +5,9 @@ import { DataStore } from './backend/data/data-store';
 import type { GalleryData } from './backend/data/gallery-data';
 import { moveMetadata, removeMetadata } from './backend/data/metadata';
 import { MediaImporter, type ImportResult } from './backend/services/media-importer';
+import { mediaKind } from './backend/media/media-kinds';
+import { ThumbnailCache } from './backend/services/thumbnail-cache';
+import { ThumbnailService } from './backend/services/thumbnail-service';
 import { MediaTrasher, type TrashResult, type TrashTarget } from './backend/services/media-trasher';
 import { GalleryView, VIEW_TYPE } from './frontend/gallery-view';
 import { GallerySettingsTab } from './frontend/settings/settings-tab';
@@ -14,6 +17,7 @@ export default class MediaHubPlugin extends Plugin {
   private store = new DataStore(data => this.saveData(data));
   private importer!: MediaImporter;
   private trasher!: MediaTrasher;
+  thumbnails!: ThumbnailService;
   private refreshTimer: number | undefined;
 
   get data(): GalleryData { return this.store.data; }
@@ -28,6 +32,7 @@ export default class MediaHubPlugin extends Plugin {
     }
     this.importer = new MediaImporter(this.app, () => this.data.importFolder);
     this.trasher = new MediaTrasher(this.app, () => this.data);
+    this.thumbnails = new ThumbnailService(this.app, new ThumbnailCache(typeof indexedDB === 'undefined' ? undefined : indexedDB));
     this.addSettingTab(new GallerySettingsTab(this.app, this));
     this.registerView(VIEW_TYPE, leaf => new GalleryView(leaf, this));
     this.addRibbonIcon('images', 'Open Media Hub', () => { void this.activate(); });
@@ -35,15 +40,20 @@ export default class MediaHubPlugin extends Plugin {
     this.registerVaultEvents();
   }
 
-  onunload(): void { if (this.refreshTimer) window.clearTimeout(this.refreshTimer); }
+  onunload(): void {
+    if (this.refreshTimer) window.clearTimeout(this.refreshTimer);
+    this.thumbnails?.dispose();
+  }
 
   private registerVaultEvents(): void {
     const vault = this.app.vault;
-    this.registerEvent(vault.on('create', () => this.scheduleRefresh()));
-    this.registerEvent(vault.on('modify', () => this.scheduleRefresh()));
+    // Only media files change the gallery, so other notes being edited do not cause redraws.
+    this.registerEvent(vault.on('create', file => this.refreshForMedia(file)));
+    this.registerEvent(vault.on('modify', file => this.refreshForMedia(file)));
     this.registerEvent(vault.on('rename', (file, oldPath) => this.handleRename(file, oldPath)));
     this.registerEvent(vault.on('delete', file => {
       removeMetadata(this.data, file.path);
+      this.thumbnails.forget(file.path);
       this.saveQuietly();
       this.scheduleRefresh();
     }));
@@ -58,6 +68,10 @@ export default class MediaHubPlugin extends Plugin {
     for (const view of this.views()) view.onPathMoved(oldPath, file.path);
     this.saveQuietly();
     this.scheduleRefresh();
+  }
+
+  private refreshForMedia(file: TAbstractFile): void {
+    if ('extension' in file && mediaKind(String(file.extension))) this.scheduleRefresh();
   }
 
   private saveQuietly(): void { void this.persist().catch(error => this.reportSaveError(error)); }
