@@ -1,9 +1,9 @@
 {
   "id": "vault-gallery",
   "name": "Media Hub",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "minAppVersion": "1.7.2",
-  "description": "Browse vault media with previews, tag chips, collections, and bulk actions.",
+  "description": "A visual media library for your vault: full-screen swipe and zoom viewer, fast cached thumbnails, tags, collections, and bulk actions.",
   "author": "Sahand",
   "isDesktopOnly": false,
   "authorUrl": "https://github.com/sahandps",

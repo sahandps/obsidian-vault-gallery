@@ -137,6 +137,13 @@ If Media Hub is useful to you, you can [buy me a coffee](https://buymeacoffee.co
 
 ## Updates
 
+### 0.5.0
+
+- Add a full-screen viewer with swipe, pinch, double-tap zoom, drag-down to close, and an animated open from the thumbnail.
+- Show file details in a side drawer on desktop and a bottom sheet on phones.
+- Cache small thumbnails on the device and reuse unchanged grid cards for smoother scrolling.
+- Reorganize the code into backend and frontend folders and add tests. Phone gestures still need physical-device verification.
+
 ### 0.4.0
 
 - Make media tabs override checked selection and close the preview.

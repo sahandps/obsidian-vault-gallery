@@ -1,18 +1,18 @@
-Media Hub 0.4.0 improves selection, video previews, personalization, and Android saving.
+Media Hub 0.5.0 makes the gallery feel like a real photo app, on desktop and phones.
 
-Switching media-type tabs now clears checkbox selection and closes the preview. **Select all** becomes **Deselect all** when all matching files are checked. The sidebar’s **All media** entry resets the type, folder, tag, and search filters.
+**Full-screen viewer.** Selecting a file now opens it full screen, growing out of its thumbnail. Swipe or use the arrow keys to move between files; the next and previous pictures are already loaded, so changes feel instant. Pinch, double-tap or use the mouse wheel to zoom, drag down or press Escape to close, and tap the picture to hide the controls. File details open in a side drawer on desktop and a bottom sheet on phones. Videos and audio keep their native controls and stop when you move away.
 
-Video cards display an early thumbnail frame when the codec is supported, without autoplay. Unsupported videos retain an icon fallback. **Gallery settings** now includes crop/fit, compact spacing, filename visibility, card-detail visibility, video thumbnails, and the default sort order for new views.
+**Smoother grid.** Large images are shrunk to small cached copies stored on your device (not in your vault), so scrolling stays smooth. Cards that did not change are kept when you filter or refresh, thumbnails fade in, and editing notes no longer redraws the gallery. Formats your device cannot decode use the original file.
 
-Android downloads now read bytes using Obsidian’s vault API and write them in chunks to a new folder under **Documents/Media Hub**. This avoids relying on native paths for vaults backed by content URIs. The download dialog shows progress, preserves error messages, times out unresponsive native calls, and verifies output size. The native bridge has an additional compatibility fallback. Automated tests pass; physical Android verification is still needed. Originals stay in the vault, with no ZIP and no Share button.
+**Cleaner code.** The plugin is now organized into backend and frontend folders with small, focused files, and has more automated tests. Your tags, descriptions, collections and settings are unchanged.
 
-Requires Obsidian **1.7.2+**. Licensed under **GPL-3.0-only**.
+Phone gestures are tested in a browser preview but still need verification on physical devices. Requires Obsidian **1.7.2+**. Licensed under **GPL-3.0-only**.
 
 [Buy me a coffee](https://buymeacoffee.com/sahandprs)
 
 ### Updates
 
-- Tab switching overrides selection; Select all/Deselect all toggle.
-- Video thumbnails with codec fallback and a settings toggle.
-- Six additional personalization controls.
-- Android vault-byte exports with chunked writes, progress, verification, and actionable errors.
+- Full-screen viewer with swipe, pinch, double-tap zoom and drag-down to close.
+- Animated open and close from the thumbnail; details drawer or bottom sheet.
+- Cached thumbnails and card reuse for a smoother grid.
+- Backend and frontend code split with new tests.
