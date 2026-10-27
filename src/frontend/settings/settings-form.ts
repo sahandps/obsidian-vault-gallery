@@ -1,10 +1,12 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
-import { Modal, PluginSettingTab, TFolder, type App, type Setting } from 'obsidian';
-import type MediaHubPlugin from './main';
-import { normalizeImportFolder, type SortOrder } from './model';
+import { TFolder } from 'obsidian';
+import type MediaHubPlugin from '../../plugin';
+import type { SortOrder } from '../../backend/data/gallery-data';
+import { normalizeImportFolder } from '../../backend/media/file-names';
 
-function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): void {
+/** Draws the settings form into a container. Shared by the settings tab and the gallery's gear dialog. */
+export function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): void {
   container.replaceChildren();
   container.classList.add('vg-settings');
   container.createEl('h2', { text: 'Media Hub' });
@@ -87,28 +89,4 @@ function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): void {
       } finally { controls.forEach(control => { control.disabled = false; }); }
     })();
   });
-}
-
-export class GallerySettingsTab extends PluginSettingTab {
-  constructor(app: App, private plugin: MediaHubPlugin) { super(app, plugin); }
-  // Obsidian 1.13+ indexes these names; earlier versions use display().
-  getSettingDefinitions() {
-    return [{
-      name: 'Media import and layout',
-      aliases: ['Default media folder', 'Thumbnail size', 'Collapse folder pane', 'Thumbnail fit', 'Compact spacing', 'Video thumbnails', 'Default sort order'],
-      render: (setting: Setting) => {
-        setting.settingEl.classList.add('vg-settings-row');
-        renderSettings(setting.settingEl, this.plugin);
-      },
-    }];
-  }
-  display(): void { renderSettings(this.containerEl, this.plugin); }
-}
-export class GallerySettingsModal extends Modal {
-  constructor(app: App, private plugin: MediaHubPlugin) { super(app); }
-  onOpen(): void {
-    this.titleEl.textContent = 'Gallery settings';
-    renderSettings(this.contentEl, this.plugin);
-  }
-  onClose(): void { this.contentEl.replaceChildren(); }
 }

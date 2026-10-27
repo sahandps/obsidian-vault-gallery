@@ -91,6 +91,33 @@ The runtime uses only Obsidian's API and native browser elements, without Node A
 
 Before publishing: test in Obsidian with light/dark themes, a large vault, unavailable codecs, file sync, and mobile. Release artifacts and automated checks are available on GitHub; browser preview checks do not replace device testing.
 
+## Project structure
+
+```text
+src/
+  main.ts                 Entry point Obsidian loads (re-exports the plugin)
+  plugin.ts               MediaHubPlugin: startup, vault events, save and refresh
+  backend/                Logic with no screens
+    data/                 Saved data: shape and cleanup, safe saving, tags, collections
+    media/                Media rules: file types, filtering, file names, folder counts
+    services/             Work on files: import, trash, desktop and Android downloads
+  frontend/               Everything the user sees
+    gallery-view.ts       The gallery tab; connects the panels below
+    selection-state.ts    Which files are checked
+    panels/               Header, filter bar, folder sidebar, grid, cards, selection bar
+      preview/            Expanded preview: toolbar, media viewport, file inspector
+    dialogs/              Tags, collections, download and delete dialogs
+    settings/             Settings form, settings tab and gear dialog
+    components/           Reusable pieces: tag editor, action modal
+tests/
+  backend/                Unit tests for data, media rules and services
+  frontend/               Gallery view tests with a simulated Obsidian
+  support/                Obsidian mock used by the tests
+preview/                  Browser preview with a sample vault
+```
+
+The backend imports nothing from the frontend, so its rules can be tested and reused without any screens.
+
 ## Browser preview
 
 Run `npm run preview`, then open **http://127.0.0.1:4173/**. This runs the production gallery view with an Obsidian adapter and a sample vault, served only on your computer. Try the folder/type/tag filters, image zoom, animated GIF, audio/video playback, and editable details. Sample illustrations, animation, audio, PDF, and video are generated locally; no external media requests are needed.

@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
-import { parseTags } from './model';
+import { parseTags } from '../../backend/data/metadata';
 
 let editorId = 0;
 export class TagEditor {

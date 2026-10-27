@@ -4,7 +4,7 @@ import { build } from 'esbuild';
 import { JSDOM } from 'jsdom';
 import { resolve } from 'node:path';
 
-const bundle = await build({ stdin: { contents: "export {default} from './src/main'; export {TFolder as MockFolder, Platform as MockPlatform, CapacitorAdapter as MockCapacitorAdapter} from './tests/obsidian-mock';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', write: false, alias: { obsidian: resolve('tests/obsidian-mock.ts') } });
+const bundle = await build({ stdin: { contents: "export {default} from './src/main'; export {TFolder as MockFolder, Platform as MockPlatform, CapacitorAdapter as MockCapacitorAdapter} from './tests/support/obsidian-mock';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', write: false, alias: { obsidian: resolve('tests/support/obsidian-mock.ts') } });
 const module = { exports: {} as any };
 new Function('module', 'exports', bundle.outputFiles[0].text)(module, module.exports);
 const GalleryPlugin = module.exports.default;

@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createCollection, filterMedia, getMetadata, mediaKind, moveMetadata, normalizeImportFolder, importPath, parseTags, removeMetadata, renamedPath, sanitizeData, type Filters, type MediaFile } from '../src/model';
+import { createCollection } from '../../src/backend/data/collections';
+import { sanitizeData } from '../../src/backend/data/gallery-data';
+import { getMetadata, moveMetadata, parseTags, removeMetadata } from '../../src/backend/data/metadata';
+import { importPath, normalizeImportFolder, renamedPath } from '../../src/backend/media/file-names';
+import { filterMedia, type Filters, type MediaFile } from '../../src/backend/media/media-filter';
+import { mediaKind } from '../../src/backend/media/media-kinds';
 const file = (path: string, size = 100, mtime = 10): MediaFile => ({ path, name: path.split('/').pop()!, extension: path.split('.').pop()!, stat: { ctime: 1, mtime, size } });
 const filters: Filters = { query: '', kind: 'all', folder: null, tag: '', sort: 'newest' };
 test('discovers media without treating arbitrary files as media', () => {

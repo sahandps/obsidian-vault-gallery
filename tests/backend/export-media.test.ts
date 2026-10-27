@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { exportPayload } from '../src/export-media';
+import { exportPayload } from '../../src/backend/services/export-media';
 
 test('downloads preserve original bytes, filenames and formats without an archive', async () => {
   const originals = [{ path: 'Art/café.jpg', bytes: new Uint8Array([0, 255, 12]).buffer }, { path: 'Other/café.jpg', bytes: new Uint8Array([3, 4]).buffer }];
