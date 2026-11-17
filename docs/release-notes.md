@@ -1,18 +1,7 @@
-Media Hub 0.5.0 makes the gallery feel like a real photo app, on desktop and phones.
+Media Hub 0.6.0 adds a read-only Immich library. Browse albums, search by filename, filter photos and videos, and open previews from the Media Hub sidebar.
 
-**Full-screen viewer.** Selecting a file now opens it full screen, growing out of its thumbnail. Swipe or use the arrow keys to move between files; the next and previous pictures are already loaded, so changes feel instant. Pinch, double-tap or use the mouse wheel to zoom, drag down or press Escape to close, and tap the picture to hide the controls. File details open in a side drawer on desktop and a bottom sheet on phones. Videos and audio keep their native controls and stop when you move away.
+Select media and choose **Insert into note** to add inline previews or links. Media Hub saves references without importing files or syncing the library. In-app video playback loads the selected clip into memory when you press Play; use **Open in Immich** to stream large clips in your browser.
 
-**Smoother grid.** Large images are shrunk to small cached copies stored on your device (not in your vault), so scrolling stays smooth. Cards that did not change are kept when you filter or refresh, thumbnails fade in, and editing notes no longer redraws the gallery. Formats your device cannot decode use the original file.
+To connect, open **Settings → Media Hub → Immich** and enter your server URL and an API key with `asset.read`, `asset.view`, and `album.read`. Choose **Test and connect**. The key is stored using Obsidian's SecretStorage and stays out of your notes and plugin data file.
 
-**Cleaner code.** The plugin is now organized into backend and frontend folders with small, focused files, and has more automated tests. Your tags, descriptions, collections and settings are unchanged.
-
-Phone gestures are tested in a browser preview but still need verification on physical devices. Requires Obsidian **1.7.2+**. Licensed under **GPL-3.0-only**.
-
-[Buy me a coffee](https://buymeacoffee.com/sahandprs)
-
-### Updates
-
-- Full-screen viewer with swipe, pinch, double-tap zoom and drag-down to close.
-- Animated open and close from the thumbnail; details drawer or bottom sheet.
-- Cached thumbnails and card reuse for a smoother grid.
-- Backend and frontend code split with new tests.
+Immich requires **Obsidian 1.11.4+**. The local vault gallery still supports **Obsidian 1.7.2+**.

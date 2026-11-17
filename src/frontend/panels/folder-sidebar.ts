@@ -2,17 +2,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import { setIcon, type TFile } from 'obsidian';
 import type { MediaCollection } from '../../backend/data/gallery-data';
+import type { ImmichAlbum } from '../../backend/immich/client';
 import { countFilesByFolder } from '../../backend/media/folder-counts';
 import { button, el } from '../dom';
 
 export interface SidebarHost {
   collections(): MediaCollection[];
   showAllMedia(): void;
+  showImmich(album: string | null): void;
   showFolder(path: string): void;
   showCollection(id: string): void;
   newCollection(): void;
 }
-export interface SidebarState { files: TFile[]; folder: string | null; collection: string | null | undefined }
+export interface SidebarState {
+  files: TFile[]; folder: string | null; collection: string | null | undefined;
+  immich?: { albums: ImmichAlbum[]; album: string | null };
+}
 
 /** The left pane: all media, collections and the folder tree. */
 export class FolderSidebar {
@@ -30,12 +35,18 @@ export class FolderSidebar {
     setIcon(el(brand, 'span', 'vg-brand-icon'), 'images');
     el(brand, 'strong', '', 'Media Hub');
     el(this.element, 'div', 'vg-sidebar-label', 'LIBRARY');
-    this.addRow('All media', 'library', state.files.length, 0, !state.collection && state.folder === null, () => this.host.showAllMedia());
+    this.addRow('All media', 'library', state.files.length, 0, !state.immich && !state.collection && state.folder === null, () => this.host.showAllMedia());
+    const immichRow = this.addRow('Immich', 'cloud', null, 0, Boolean(state.immich && !state.immich.album), () => this.host.showImmich(null), 'Browse your Immich library');
+    immichRow.classList.add('vg-immich-source');
+    if (state.immich?.albums.length) {
+      el(this.element, 'div', 'vg-sidebar-label vg-folder-label', 'IMMICH ALBUMS');
+      for (const album of state.immich.albums) this.addRow(album.name, 'album', album.count, 0, state.immich.album === album.id, () => this.host.showImmich(album.id), album.name);
+    }
     this.renderCollections(state);
     this.renderFolders(state);
     const footer = el(this.element, 'div', 'vg-sidebar-footer');
     setIcon(el(footer, 'span', 'vg-icon'), 'hard-drive');
-    el(footer, 'span', '', 'Local files. Your vault.');
+    el(footer, 'span', '', state.immich ? 'Originals stay in Immich' : 'Local files. Your vault.');
   }
 
   private renderCollections(state: SidebarState): void {
@@ -45,7 +56,7 @@ export class FolderSidebar {
     const knownPaths = new Set(state.files.map(file => file.path));
     for (const collection of [...this.host.collections()].sort((a, b) => a.name.localeCompare(b.name))) {
       const row = button(this.element, `Collection ${collection.name}`, null, () => this.host.showCollection(collection.id), 'vg-folder');
-      row.setAttribute('aria-pressed', String(state.collection === collection.id));
+      row.setAttribute('aria-pressed', String(!state.immich && state.collection === collection.id));
       row.replaceChildren();
       setIcon(el(row, 'span', 'vg-icon'), 'album');
       el(row, 'span', 'vg-folder-name', collection.name);
@@ -58,12 +69,12 @@ export class FolderSidebar {
     const counts = countFilesByFolder(state.files);
     for (const [path, count] of [...counts].sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))) {
       const parts = path.split('/');
-      const active = !state.collection && state.folder === path;
+      const active = !state.immich && !state.collection && state.folder === path;
       this.addRow(path ? parts[parts.length - 1] : 'Vault root', 'folder', count, path ? parts.length - 1 : 0, active, () => this.host.showFolder(path), path || 'Vault root');
     }
   }
 
-  private addRow(label: string, icon: string, count: number, depth: number, pressed: boolean, action: () => void, title = 'All media in the vault'): void {
+  private addRow(label: string, icon: string, count: number | null, depth: number, pressed: boolean, action: () => void, title = 'All media in the vault'): HTMLButtonElement {
     const row = button(this.element, label, null, action, 'vg-folder');
     row.setCssProps({ '--vg-depth': String(Math.min(depth, 5)) });
     row.title = title;
@@ -71,6 +82,7 @@ export class FolderSidebar {
     row.replaceChildren();
     setIcon(el(row, 'span', 'vg-icon'), icon);
     el(row, 'span', 'vg-folder-name', label);
-    el(row, 'span', 'vg-folder-count', String(count));
+    if (count !== null) el(row, 'span', 'vg-folder-count', String(count));
+    return row;
   }
 }

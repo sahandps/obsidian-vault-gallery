@@ -16,6 +16,8 @@ export interface HeaderHost {
 /** Title bar: folder pane toggle, file counter, Add media, settings and refresh. */
 export class GalleryHeader {
   private counter: HTMLElement;
+  private eyebrow: HTMLElement;
+  private importButton?: HTMLButtonElement;
   private sidebarToggle: HTMLButtonElement;
 
   constructor(parent: HTMLElement, private app: App, private plugin: MediaHubPlugin, private host: HeaderHost) {
@@ -23,7 +25,7 @@ export class GalleryHeader {
     this.sidebarToggle = button(header, 'Toggle folder pane', 'panel-left', () => this.toggleSidebar(), 'vg-icon-button vg-sidebar-toggle');
     this.sidebarToggle.setAttribute('aria-controls', host.sidebarId);
     const heading = el(header, 'div', 'vg-header-heading');
-    el(heading, 'div', 'vg-eyebrow', 'YOUR VAULT, IN VIEW');
+    this.eyebrow = el(heading, 'div', 'vg-eyebrow', 'YOUR VAULT, IN VIEW');
     el(heading, 'h1', '', 'Media library');
     const actions = el(header, 'div', 'vg-header-actions');
     this.counter = el(actions, 'span', 'vg-counter');
@@ -34,6 +36,17 @@ export class GalleryHeader {
   }
 
   setCount(shown: number, total: number): void { this.counter.textContent = `${shown} / ${total} files`; }
+
+  setImmich(connected: boolean, loaded: number): void {
+    this.eyebrow.textContent = connected ? 'Immich · read only' : 'Immich';
+    this.counter.textContent = connected ? loaded + ' loaded' : '';
+    if (this.importButton) this.importButton.hidden = true;
+  }
+
+  setVault(): void {
+    this.eyebrow.textContent = 'Your vault, in view';
+    if (this.importButton) this.importButton.hidden = false;
+  }
 
   applySettings(): void {
     const collapsed = this.plugin.data.sidebarCollapsed;
@@ -56,7 +69,7 @@ export class GalleryHeader {
     const picker = el(actions, 'input');
     picker.type = 'file'; picker.multiple = true; picker.accept = mediaAccept(); picker.hidden = true;
     picker.setAttribute('aria-label', 'Choose media files');
-    const importButton = button(actions, 'Add media', null, () => picker.click(), 'mod-cta vg-add-media');
+    const importButton = this.importButton = button(actions, 'Add media', null, () => picker.click(), 'mod-cta vg-add-media');
     const status = el(actions, 'span', 'vg-import-status');
     status.setAttribute('role', 'status');
     picker.addEventListener('change', () => {

@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
 import { ItemView, Notice, type TFile, type WorkspaceLeaf } from 'obsidian';
+import type { ImmichAlbum } from '../backend/immich/client';
+import { ImmichLibrary } from './immich/library';
 import { getMetadata } from '../backend/data/metadata';
 import { filterMedia, type Filters } from '../backend/media/media-filter';
 import { countFilesByFolder } from '../backend/media/folder-counts';
@@ -37,6 +39,12 @@ export class GalleryView extends ItemView {
   private selectionBar!: SelectionBar;
   private preview!: Lightbox;
   private grid!: MediaGrid;
+  private main!: HTMLElement;
+  private localContent!: HTMLElement;
+  private immich?: ImmichLibrary;
+  private inImmich = false;
+  private immichAlbums: ImmichAlbum[] = [];
+  private immichAlbum: string | null = null;
 
   constructor(leaf: WorkspaceLeaf, private plugin: MediaHubPlugin) { super(leaf); }
   getViewType(): string { return VIEW_TYPE; }
@@ -49,14 +57,15 @@ export class GalleryView extends ItemView {
     root.classList.add('vg-root');
     root.tabIndex = -1;
     this.sidebar = new FolderSidebar(root, this.sidebarHost());
-    const main = el(root, 'main', 'vg-main');
+    const main = this.main = el(root, 'main', 'vg-main');
     this.header = new GalleryHeader(main, this.app, this.plugin, {
       sidebarId: this.sidebar.element.id,
-      refresh: () => this.refresh(),
+      refresh: () => this.inImmich ? this.refreshImmich() : this.refresh(),
       imported: paths => this.showImported(paths),
     });
-    this.filterBar = new FilterBar(main, this.plugin, this.filterBarHost());
-    const scroll = el(main, 'div', 'vg-scroll');
+    this.localContent = el(main, 'div', 'vg-vault-content');
+    this.filterBar = new FilterBar(this.localContent, this.plugin, this.filterBarHost());
+    const scroll = el(this.localContent, 'div', 'vg-scroll');
     this.results = new ResultsHeading(scroll, {
       clearFilters: () => this.clearFilters(),
       toggleSelectAll: () => this.toggleSelectAll(),
@@ -72,6 +81,8 @@ export class GalleryView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    this.immich?.close();
+    this.immich = undefined; this.inImmich = false; this.immichAlbums = []; this.immichAlbum = null;
     this.preview?.dispose();
     this.grid?.dispose();
     stopMedia(this.contentEl);
@@ -97,7 +108,31 @@ export class GalleryView extends ItemView {
     if (this.filters.collection && !this.plugin.data.collections.some(item => item.id === this.filters.collection)) this.filters.collection = null;
     this.renderTagOptions();
     this.renderSidebar();
-    this.applyFilters();
+    if (!this.inImmich) this.applyFilters();
+  }
+
+  refreshImmich(connectionChanged = false): void {
+    if (this.inImmich) this.immich?.refreshConnection(connectionChanged);
+  }
+
+  private showImmich(album: string | null): void {
+    this.immich ??= new ImmichLibrary(this.main, this.plugin, {
+      albums: (albums, selected) => { this.immichAlbums = albums; this.immichAlbum = selected; this.renderSidebar(); },
+      count: count => this.header.setImmich(Boolean(this.plugin.immichClient()), count),
+    });
+    this.select(null);
+    this.localContent.hidden = true;
+    this.inImmich = true;
+    this.header.setImmich(Boolean(this.plugin.immichClient()), 0);
+    this.immich.open(album);
+  }
+
+  private showVault(): void {
+    if (!this.inImmich) return;
+    this.inImmich = false;
+    this.localContent.hidden = false;
+    this.immich?.close();
+    this.header.setVault();
   }
 
   applySettings(): void {
@@ -132,7 +167,10 @@ export class GalleryView extends ItemView {
 
   private renderSidebar(): void {
     if (this.filters.folder !== null && !countFilesByFolder(this.files).has(this.filters.folder)) this.filters.folder = null;
-    this.sidebar.render({ files: this.files, folder: this.filters.folder, collection: this.filters.collection });
+    this.sidebar.render({
+      files: this.files, folder: this.filters.folder, collection: this.filters.collection,
+      immich: this.inImmich ? { albums: this.immichAlbums, album: this.immichAlbum } : undefined,
+    });
   }
 
   private applyFilters(): void {
@@ -175,6 +213,7 @@ export class GalleryView extends ItemView {
   }
 
   private handleKey(event: KeyboardEvent): void {
+    if (this.inImmich) return;
     const target = event.target as HTMLElement;
     if (target.matches('input:not([type="checkbox"]), textarea, select, [contenteditable="true"], video, audio')) return;
     if (event.key === 'Escape') { this.select(null); event.preventDefault(); }
@@ -226,13 +265,15 @@ export class GalleryView extends ItemView {
     const redraw = () => { this.renderSidebar(); this.applyFilters(); };
     return {
       collections: () => this.plugin.data.collections,
+      showImmich: (album: string | null) => this.showImmich(album),
       showAllMedia: () => {
+        this.showVault();
         Object.assign(this.filters, { folder: null, collection: null, kind: 'all', tag: '', query: '' });
         this.filterBar.setQuery(''); resetSelection(); redraw();
       },
-      showFolder: (path: string) => { Object.assign(this.filters, { folder: path, collection: null }); resetSelection(); redraw(); },
-      showCollection: (id: string) => { Object.assign(this.filters, { collection: id, folder: null }); redraw(); },
-      newCollection: () => this.openCollections([]),
+      showFolder: (path: string) => { this.showVault(); Object.assign(this.filters, { folder: path, collection: null }); resetSelection(); redraw(); },
+      showCollection: (id: string) => { this.showVault(); Object.assign(this.filters, { collection: id, folder: null }); redraw(); },
+      newCollection: () => { this.showVault(); redraw(); this.openCollections([]); },
     };
   }
 

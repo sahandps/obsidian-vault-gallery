@@ -34,6 +34,7 @@ export class Plugin {
   async saveData(data: unknown) { localStorage.setItem('vault-gallery-preview', JSON.stringify(data)); }
   registerView(_type: string, factory: any) { this.factory = factory; }
   registerEvent() {}
+  registerMarkdownCodeBlockProcessor() {}
   addRibbonIcon() {}
   addCommand() {}
   addSettingTab(tab: any) { this.settingsTab = tab; }
@@ -83,3 +84,15 @@ export function setIcon(node: HTMLElement, name: string) {
 
 export const Platform = { isAndroidApp: false };
 export class CapacitorAdapter { getFullPath(path: string): string { return `/vault/${path}`; } }
+
+export class MarkdownView {}
+export class MarkdownRenderChild {
+  constructor(public containerEl: HTMLElement) {}
+}
+export class FuzzySuggestModal<T> extends Modal {
+  setPlaceholder() {}
+  getItems(): T[] { return []; }
+}
+export async function requestUrl(): Promise<never> { throw new Error('Immich is available in Obsidian.'); }
+
+export function requireApiVersion() { return true; }

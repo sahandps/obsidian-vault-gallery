@@ -38,5 +38,6 @@ export class DataStore {
       else delete this.data.metadata[path];
     }
     if (same(this.data.collections, next.collections)) this.data.collections = previous.collections;
+    if (same(this.data.immich, next.immich)) this.data.immich = previous.immich;
   }
 }

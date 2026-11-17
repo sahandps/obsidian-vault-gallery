@@ -11,7 +11,7 @@ export class GallerySettingsTab extends PluginSettingTab {
   getSettingDefinitions() {
     return [{
       name: 'Media import and layout',
-      aliases: ['Default media folder', 'Thumbnail size', 'Collapse folder pane', 'Thumbnail fit', 'Compact spacing', 'Video thumbnails', 'Default sort order'],
+      aliases: ['Immich', 'API key', 'Default media folder', 'Thumbnail size', 'Collapse folder pane', 'Thumbnail fit', 'Compact spacing', 'Video thumbnails', 'Default sort order'],
       render: (setting: Setting) => {
         setting.settingEl.classList.add('vg-settings-row');
         renderSettings(setting.settingEl, this.plugin);

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
 import { TFolder } from 'obsidian';
+import { renderImmichSettings } from '../immich/settings';
 import type MediaHubPlugin from '../../plugin';
 import type { SortOrder } from '../../backend/data/gallery-data';
 import { normalizeImportFolder } from '../../backend/media/file-names';
@@ -10,6 +11,7 @@ export function renderSettings(container: HTMLElement, plugin: MediaHubPlugin): 
   container.replaceChildren();
   container.classList.add('vg-settings');
   container.createEl('h2', { text: 'Media Hub' });
+  renderImmichSettings(container, plugin);
   const folderLabel = container.createEl('label', { cls: 'vg-setting-field' });
   folderLabel.createEl('strong', { text: 'Default media folder' });
   const folder = folderLabel.createEl('input', { type: 'text', value: plugin.data.importFolder, placeholder: 'Media' });

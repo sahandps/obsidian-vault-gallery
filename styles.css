@@ -215,3 +215,24 @@
 @media (prefers-reduced-motion: reduce) {
   .vg-track.is-settling .vg-slide, .vg-slide-image.is-snapping, .vg-lightbox-drawer, .vg-lightbox-bar { transition: none; }
 }
+
+/* Immich shares the gallery's layout and cards. Its media never enters vault file actions. */
+.vg-vault-content, .vg-immich-library { display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; }
+.vg-root .vg-add-media[hidden], .vg-root .vg-thumb img[hidden], .vg-immich-settings [hidden],
+.vg-immich-modal [hidden], .vg-immich-embed [hidden] { display: none; }
+.vg-immich-status { margin: 0 0 12px; color: var(--text-muted); font-size: var(--font-ui-small, 12px); }
+.vg-immich-status:empty { display: none; }
+.vg-immich-album-error { margin-inline: 30px; }
+.vg-immich-library .vg-load-more:not([hidden]) { display: block; margin: 16px auto 0; }
+.vg-immich-stage { display: grid; justify-items: center; min-width: 0; }
+.vg-immich-stage .vg-immich-preview-image, .vg-immich-stage .vg-immich-preview-video {
+  max-width: 100%; max-height: 60vh; object-fit: contain;
+}
+.vg-immich-stage .vg-immich-preview-video { width: 100%; }
+.vg-immich-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-block: 12px; }
+.vg-immich-embed { margin: 1em 0; }
+.vg-immich-embed figcaption { color: var(--text-muted); font-size: var(--font-ui-small, 12px); margin-top: 6px; }
+.vg-immich-modal { width: min(92vw, 900px); }
+.vg-immich-modal .vg-preview-tools { padding-inline: 0; margin-bottom: 12px; }
+.vg-immich-settings { padding: 0 0 10px; border-bottom: 1px solid var(--background-modifier-border); }
+.vg-immich-settings input { width: 100%; }

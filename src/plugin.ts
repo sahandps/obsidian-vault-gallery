@@ -1,8 +1,12 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
-import { Notice, Plugin, TFolder, type TAbstractFile } from 'obsidian';
+import { Notice, Plugin, requestUrl, TFolder, type TAbstractFile } from 'obsidian';
 import { DataStore } from './backend/data/data-store';
 import type { GalleryData } from './backend/data/gallery-data';
+import { ImmichClient, normalizeServer } from './backend/immich/client';
+import { immichSecrets } from './backend/immich/secrets';
+import { IMMICH_BLOCK } from './backend/immich/references';
+import { ImmichEmbed } from './frontend/immich/media';
 import { moveMetadata, removeMetadata } from './backend/data/metadata';
 import { MediaImporter, type ImportResult } from './backend/services/media-importer';
 import { mediaKind } from './backend/media/media-kinds';
@@ -38,6 +42,9 @@ export default class MediaHubPlugin extends Plugin {
     this.addRibbonIcon('images', 'Open Media Hub', () => { void this.activate(); });
     this.addCommand({ id: 'open-gallery', name: 'Open gallery', callback: () => { void this.activate(); } });
     this.registerVaultEvents();
+    this.registerMarkdownCodeBlockProcessor(IMMICH_BLOCK, (source, element, context) => {
+      context.addChild(new ImmichEmbed(element, source, this));
+    });
   }
 
   onunload(): void {
@@ -97,6 +104,46 @@ export default class MediaHubPlugin extends Plugin {
   private scheduleRefresh(): void {
     if (this.refreshTimer) window.clearTimeout(this.refreshTimer);
     this.refreshTimer = window.setTimeout(() => this.refreshViews(), 180);
+  }
+
+  immichClient(expectedServer?: string): ImmichClient | null {
+    const connection = this.data.immich;
+    if (!connection || (expectedServer && expectedServer !== connection.server)) return null;
+    const key = immichSecrets(this.app)?.getSecret(connection.secretId);
+    if (!key) return null;
+    return new ImmichClient(connection.server, key, async request => {
+      // Previously rendered notes may keep a client after the user disconnects or replaces the key.
+      if (this.data.immich?.secretId !== connection.secretId || immichSecrets(this.app)?.getSecret(connection.secretId) !== key) {
+        throw new Error('Immich connection changed.');
+      }
+      return await requestUrl(request);
+    });
+  }
+
+  async connectImmich(server: string, key: string): Promise<void> {
+    const secrets = immichSecrets(this.app);
+    if (!secrets) throw new Error('Update Obsidian to 1.11.4 or newer to store an Immich API key.');
+    const base = normalizeServer(server);
+    const previous = this.data.immich;
+    const existing = previous && previous.server === base ? secrets.getSecret(previous.secretId) : null;
+    const credential = key.trim() || existing;
+    if (!credential) throw new Error('Enter an Immich API key.');
+    const client = new ImmichClient(base, credential, requestUrl);
+    const [, page] = await Promise.all([client.albums(), client.search({ size: 1 })]);
+    if (page.items[0]) await client.image(page.items[0].id, 'thumbnail');
+    const secretId = previous?.server === base ? previous.secretId : 'media-hub-immich-' + crypto.randomUUID();
+    secrets.setSecret(secretId, credential);
+    try { await this.store.mutate(data => { data.immich = { server: base, secretId }; }); }
+    catch (error) { secrets.setSecret(secretId, existing ?? ''); throw error; }
+    if (previous && previous.secretId !== secretId) secrets.setSecret(previous.secretId, '');
+    for (const view of this.views()) view.refreshImmich(true);
+  }
+
+  async disconnectImmich(): Promise<void> {
+    const connection = this.data.immich;
+    await this.store.mutate(data => { delete data.immich; });
+    if (connection) immichSecrets(this.app)?.setSecret(connection.secretId, '');
+    for (const view of this.views()) view.refreshImmich(true);
   }
 
   applyViewSettings(): void { for (const view of this.views()) view.applySettings(); }

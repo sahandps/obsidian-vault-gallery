@@ -456,3 +456,122 @@ test('video cards prepare a muted thumbnail frame without autoplay and retain fa
   assert.match(doc.querySelector('.vg-thumb')!.textContent!, /Select to play/);
   await view.onClose();
 });
+
+test('Immich connects, browses paged media, plays on demand and inserts an authenticated note reference without importing media', async () => {
+  const { createServer } = await import('node:http');
+  const album = '995358bd-92f8-47f4-8c70-eadf4b53582a';
+  const photo = { id: '1a8bd022-59ed-4f42-ad09-c96415d85b87', type: 'IMAGE', originalFileName: 'coast.jpg', fileCreatedAt: '2026-10-29T00:00:00Z' };
+  const video = { id: '8ae779db-d4ae-4fc8-8b2b-f27bd4fb8e31', type: 'VIDEO', originalFileName: 'ferry.mp4', fileCreatedAt: '2026-10-28T00:00:00Z', duration: '00:00:04.000' };
+  const key = 'fixture-private-key';
+  const calls: Array<{ url: string; method: string; auth: string | undefined; body: any }> = [];
+  const router = createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
+    req.on('end', () => {
+      const url = req.url ?? '';
+      const auth = req.headers['x-api-key'];
+      const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString()) : undefined;
+      calls.push({ url, method: req.method ?? '', auth: typeof auth === 'string' ? auth : undefined, body });
+      const json = (payload: unknown) => { res.setHeader('content-type', 'application/json'); res.end(JSON.stringify(payload)); };
+      if (auth !== key) { res.statusCode = 401; return json({ message: 'Bad key' }); }
+      if (url === '/api/albums') return json([{ id: album, albumName: 'West coast', assetCount: 2 }]);
+      if (url === '/api/search/metadata' && req.method === 'POST') {
+        const videoOnly = body.type === 'VIDEO' || body.originalFileName === 'ferry';
+        return json({ assets: { items: [body.page === 2 || videoOnly ? video : photo], nextPage: body.page === 1 && body.size > 1 && !videoOnly ? '2' : null } });
+      }
+      if (url === '/api/assets/' + photo.id) return json(photo);
+      if (url.match(/^\/api\/assets\/[^/]+\/thumbnail\?size=(thumbnail|preview)$/)) {
+        res.setHeader('Content-Type', 'image/png'); return res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR2gAAAAASUVORK5CYII=', 'base64'));
+      }
+      if (url === '/api/assets/' + video.id + '/video/playback') { res.setHeader('Content-Type', 'video/mp4'); return res.end(Buffer.from('fixture video')); }
+      res.statusCode = 404; return json({ message: 'Unknown route' });
+    });
+  });
+  await new Promise<void>(resolve => router.listen(0, '127.0.0.1', resolve));
+  const address = router.address();
+  assert.ok(address && typeof address === 'object');
+  const server = 'http://127.0.0.1:' + address.port;
+  const { dom, doc, plugin, view, click, created, opened } = await setup();
+  const secrets = new Map<string, string>();
+  plugin.app.secretStorage = { getSecret: (id: string) => secrets.get(id), setSecret: (id: string, value: string) => secrets.set(id, value) };
+  const note = { path: 'Trip.md', name: 'Trip.md' };
+  let content = '# Trip\nExisting note text.\n';
+  plugin.app.vault.getMarkdownFiles = () => [note];
+  plugin.app.workspace.getLastOpenFiles = () => [note.path];
+  plugin.app.vault.process = async (file: unknown, change: (old: string) => string) => { assert.equal(file, note); content = change(content); };
+  dom.window.HTMLMediaElement.prototype.play = () => Promise.resolve();
+  async function eventually(condition: () => boolean): Promise<void> {
+    for (let i = 0; i < 150; i++) {
+      if (condition()) return;
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    assert.fail('Expected Immich UI to settle');
+  }
+  try {
+    click('Immich');
+    assert.ok(doc.querySelector('button[aria-label="Connect Immich"]'));
+    await assert.rejects(plugin.connectImmich(server, 'wrong-key'), /denied access/);
+    assert.equal(plugin.data.immich, undefined);
+    await plugin.connectImmich(server + '/api/', key);
+    assert.equal(plugin.data.immich.server, server);
+    assert.ok(!JSON.stringify(plugin.saved).includes(key));
+    assert.equal(secrets.get(plugin.data.immich.secretId), key);
+
+    await eventually(() => Boolean(doc.querySelector('button[aria-label="West coast"]')));
+    click('West coast');
+    await eventually(() => Boolean(doc.querySelector('.vg-immich-library button[aria-label="Preview coast.jpg"]')));
+    click('Load more');
+    await eventually(() => doc.querySelectorAll('.vg-immich-library .vg-card').length === 2);
+    assert.ok(calls.some(call => call.body?.albumIds?.[0] === album && call.body?.page === 2));
+    assert.ok(calls.filter(call => call.url.includes('/thumbnail')).every(call => call.auth === key));
+
+    click('Preview ferry.mp4');
+    assert.ok(!calls.some(call => call.url.endsWith('/video/playback')));
+    click('Play video');
+    await eventually(() => Boolean(doc.querySelector('.vg-immich-modal video[controls]')));
+    assert.match(doc.querySelector<HTMLVideoElement>('.vg-immich-modal video')!.src, /^blob:/);
+    click('Close dialog');
+
+    const search = doc.querySelector<HTMLInputElement>('input[aria-label="Search Immich filenames"]')!;
+    search.value = 'ferry'; search.dispatchEvent(new dom.window.Event('input'));
+    await eventually(() => doc.querySelectorAll('.vg-immich-library .vg-card').length === 1 &&
+      Boolean(doc.querySelector('.vg-immich-library button[aria-label="Preview ferry.mp4"]')));
+    assert.ok(calls.some(call => call.body?.originalFileName === 'ferry'));
+    doc.querySelector<HTMLButtonElement>('.vg-immich-library button[aria-label="Clear filters"]')!.click();
+    await eventually(() => Boolean(doc.querySelector('.vg-immich-library button[aria-label="Preview coast.jpg"]')));
+    doc.querySelector<HTMLInputElement>('input[aria-label="Select coast.jpg"]')!.click();
+    click('Insert into note');
+    const noteOption = Array.from(doc.querySelectorAll<HTMLButtonElement>('.preview-modal button')).find(el => el.textContent === 'Trip.md');
+    assert.ok(noteOption); noteOption.click();
+    await eventually(() => opened.includes(note));
+    assert.ok(content.startsWith('# Trip\nExisting note text.\n'));
+    assert.match(content, /\x60\x60\x60immich/);
+    assert.ok(content.includes(photo.id) && !content.includes(key));
+    assert.deepEqual(created, []);
+
+    const processor = plugin.blockRenderers.get('immich');
+    assert.ok(processor);
+    const embed = doc.body.appendChild(doc.createElement('div'));
+    let renderer: any;
+    processor(JSON.stringify({ server, id: photo.id }), embed, { addChild: (child: any) => { renderer = child; child.onload(); } });
+    await eventually(() => Boolean(embed.querySelector('img[src^="blob:"]')));
+    renderer.onunload();
+    const requestsBefore = calls.length;
+    processor(JSON.stringify({ server: 'https://different.example', id: photo.id }), embed, { addChild: (child: any) => child.onload() });
+    await tick();
+    assert.equal(calls.length, requestsBefore);
+    assert.match(embed.textContent ?? '', /Connect this Immich server/);
+
+    const secretId = plugin.data.immich.secretId;
+    await plugin.disconnectImmich();
+    assert.equal(secrets.get(secretId), '');
+    assert.ok(doc.querySelector('button[aria-label="Connect Immich"]:not([hidden])'));
+    click('All media');
+    assert.equal(doc.querySelectorAll('.vg-vault-content .vg-card').length, 5);
+    assert.equal(doc.querySelector('.vg-vault-content')?.hasAttribute('hidden'), false);
+  } finally {
+    await view.onClose();
+    dom.window.close();
+    await new Promise<void>((resolve, reject) => router.close(error => error ? reject(error) : resolve()));
+  }
+});

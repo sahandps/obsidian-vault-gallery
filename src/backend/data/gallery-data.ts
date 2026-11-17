@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
 import { normalizeImportFolder } from '../media/file-names';
+import { normalizeServer, type ImmichConnection } from '../immich/client';
 import { parseTags } from './metadata';
 
 export type SortOrder = 'newest' | 'oldest' | 'name' | 'largest';
@@ -8,6 +9,7 @@ export interface MediaMetadata { tags: string[]; description: string }
 export interface MediaCollection { id: string; name: string; paths: string[] }
 export interface GalleryData {
   version: 1;
+  immich?: ImmichConnection;
   thumbnailSize: number;
   importFolder: string;
   sidebarCollapsed: boolean;
@@ -45,6 +47,9 @@ export function sanitizeData(raw: unknown): GalleryData {
   if (typeof input.sidebarCollapsed === 'boolean') data.sidebarCollapsed = input.sidebarCollapsed;
   if (typeof input.importFolder === 'string') {
     try { data.importFolder = normalizeImportFolder(input.importFolder); } catch { /* Keep the safe default for older or malformed settings. */ }
+  }
+  if (typeof input.immich?.server === 'string' && typeof input.immich.secretId === 'string' && /^media-hub-immich-[a-z0-9-]+$/.test(input.immich.secretId)) {
+    try { data.immich = { server: normalizeServer(input.immich.server), secretId: input.immich.secretId }; } catch { /* Ignore invalid legacy settings. */ }
   }
   copyMetadata(input, data);
   copyCollections(input, data);

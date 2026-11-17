@@ -28,6 +28,8 @@ export class Plugin {
   async saveData(data: any) { this.saved.push(data); this.stored = data; }
   registerView(_type: string, factory: any) { this.factory = factory; }
   registerEvent(_event: any) {}
+  blockRenderers = new Map<string, (...args: any[]) => void>();
+  registerMarkdownCodeBlockProcessor(language: string, handler: (...args: any[]) => void) { this.blockRenderers.set(language, handler); }
   addRibbonIcon() {}
   addCommand() {}
   addSettingTab(tab: any) { this.settingsTab = tab; }
@@ -67,3 +69,34 @@ export function setIcon(node: HTMLElement, name: string) { node.setAttribute('da
 
 export const Platform = { isAndroidApp: false };
 export class CapacitorAdapter { getFullPath(path: string): string { return `/vault/${path}`; } }
+
+export class MarkdownView {}
+export class MarkdownRenderChild {
+  constructor(public containerEl: HTMLElement) {}
+}
+export class FuzzySuggestModal<T> extends Modal {
+  setPlaceholder() {}
+  getItems(): T[] { return []; }
+  getItemText(item: T): string { return String(item); }
+  onChooseItem(_item: T) {}
+  onOpen() {
+    for (const item of this.getItems()) {
+      const itemButton = (this.contentEl as any).createEl('button', { text: this.getItemText(item) });
+      itemButton.onclick = () => { this.close(); this.onChooseItem(item); };
+    }
+  }
+}
+import type { RequestUrlParam } from 'obsidian';
+export async function requestUrl(options: RequestUrlParam) {
+  const res = await fetch(options.url, {
+    method: options.method, body: options.body,
+    headers: { ...options.headers, ...(options.contentType ? { 'content-type': options.contentType } : {}) },
+  });
+  const arrayBuffer = await res.arrayBuffer();
+  return {
+    status: res.status, headers: Object.fromEntries(res.headers), arrayBuffer,
+    get json() { return JSON.parse(new TextDecoder().decode(arrayBuffer)); },
+  };
+}
+
+export function requireApiVersion() { return true; }
