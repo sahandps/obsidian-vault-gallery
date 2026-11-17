@@ -492,6 +492,11 @@ test('Immich connects, browses paged media, plays on demand and inserts an authe
   assert.ok(address && typeof address === 'object');
   const server = 'http://127.0.0.1:' + address.port;
   const { dom, doc, plugin, view, click, created, opened } = await setup();
+  // Obsidian lists background tabs by their saved type before constructing their views.
+  const getLeaves = plugin.app.workspace.getLeavesOfType.bind(plugin.app.workspace);
+  plugin.app.workspace.getLeavesOfType = (type: string) => type === 'vault-gallery'
+    ? [{ isDeferred: true, view: { getViewType: () => 'vault-gallery' } }, ...getLeaves(type)]
+    : getLeaves(type);
   const secrets = new Map<string, string>();
   plugin.app.secretStorage = { getSecret: (id: string) => secrets.get(id), setSecret: (id: string, value: string) => secrets.set(id, value) };
   const note = { path: 'Trip.md', name: 'Trip.md' };

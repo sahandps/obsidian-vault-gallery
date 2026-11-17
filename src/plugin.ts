@@ -84,7 +84,8 @@ export default class MediaHubPlugin extends Plugin {
   private saveQuietly(): void { void this.persist().catch(error => this.reportSaveError(error)); }
 
   private views(): GalleryView[] {
-    return this.app.workspace.getLeavesOfType(VIEW_TYPE).map(leaf => leaf.view as GalleryView);
+    // Background tabs can report this type before Obsidian constructs their GalleryView.
+    return this.app.workspace.getLeavesOfType(VIEW_TYPE).flatMap(({ view }) => view instanceof GalleryView ? [view] : []);
   }
 
   private async activate(): Promise<void> {
