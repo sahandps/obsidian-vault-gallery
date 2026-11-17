@@ -69,14 +69,14 @@ Use a test vault for your first run. This plugin has automated tests but has not
 
 Media Hub can browse your Immich library as a read-only source without copying it into your vault. Immich integration requires **Obsidian 1.11.4 or newer**; the local gallery still supports earlier versions.
 
-1. In Immich, go to your account settings and create an API key with **`asset.read`**, **`asset.view`**, and **`album.read`**. No upload, deletion, or download permission is needed by Media Hub.
+1. In Immich, go to your account settings and create an API key with **`asset.read`**, **`asset.view`**, and **`album.read`**. Add **`asset.download`** if you want GIFs to animate in Media Hub. The gallery can still show GIF thumbnails without it.
 2. Open **Settings → Media Hub → Immich**, enter your server URL and key, and choose **Test and connect**. Use the final Immich URL reachable from this device. Prefer HTTPS, especially outside a trusted local network.
-3. Open **Media Hub → Immich** in the sidebar. Browse albums, search filenames, filter images or videos, and use **Load more** to fetch another page. Opening a card shows a larger preview.
+3. Open **Media Hub → Immich** in the sidebar. Browse albums, search filenames, filter images, GIFs, or videos, and use **Load more** to fetch another page. Opening a card shows a larger preview.
 4. Select media, choose **Inline preview** or **Link only**, then click **Insert into note** and choose a Markdown note. An open note receives the reference at its cursor; a closed note receives it at the end. Inline references show up in Reading view and Live Preview.
 
 Inline references store only the server URL and the asset ID. The API key is stored in Obsidian's SecretStorage and is never written to the note or plugin settings file. To render embeds on another device, connect to the same Immich server there. Ordinary links use Immich's normal login and access rules. The plugin does not make items public.
 
-Thumbnails and photo previews are loaded on demand. **Play video** retrieves the requested playback file into memory for that player and does not save it to the vault. For large files or unsupported codecs, choose **Open in Immich** to stream in the browser. **Disconnect** clears the plugin's stored key; existing note references still point to their original server.
+Thumbnails and photo previews are loaded on demand. GIFs use still thumbnails in the grid and animate in the full preview or an inline note embed. The original GIF is fetched into memory only when its preview opens; Media Hub does not save it to the vault. **Play video** retrieves the requested playback file into memory for that player and does not save it to the vault. For large files or unsupported codecs, choose **Open in Immich** to stream in the browser. **Disconnect** clears the plugin's stored key; existing note references still point to their original server.
 
 ## Media and performance
 

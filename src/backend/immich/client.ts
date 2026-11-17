@@ -3,9 +3,10 @@
 import type { RequestUrlParam, RequestUrlResponse } from 'obsidian';
 
 export interface ImmichConnection { server: string; secretId: string }
-export interface ImmichAsset { id: string; name: string; type: 'IMAGE' | 'VIDEO'; date: string; duration: string }
+export type ImmichMediaKind = 'image' | 'gif' | 'video';
+export interface ImmichAsset { id: string; name: string; kind: ImmichMediaKind; date: string; duration: string }
 export interface ImmichAlbum { id: string; name: string; count: number | null }
-export interface AssetQuery { album?: string; type?: ImmichAsset['type']; name?: string; page?: number; size?: number; order?: 'asc' | 'desc' }
+export interface AssetQuery { album?: string; kind?: ImmichMediaKind; name?: string; page?: number; size?: number; order?: 'asc' | 'desc' }
 export interface AssetPage { items: ImmichAsset[]; nextPage: number | null }
 
 export function normalizeServer(input: string): string {
@@ -33,10 +34,15 @@ function object(value: unknown): Record<string, unknown> {
 }
 
 export function readAsset(raw: unknown): ImmichAsset | null {
-  const { id, type, originalFileName, fileCreatedAt, duration } = object(raw);
+  const { id, type, originalFileName, originalPath, originalMimeType, fileCreatedAt, duration } = object(raw);
   if (!isAssetId(id) || (type !== 'IMAGE' && type !== 'VIDEO')) return null;
+  const filename = typeof originalFileName === 'string' ? originalFileName.trim() : '';
+  const path = typeof originalPath === 'string' ? originalPath : '';
+  const gif = type === 'IMAGE' && (originalMimeType === 'image/gif' || /\.gif$/i.test(path) || /\.gif$/i.test(filename));
+  const name = filename || (type === 'VIDEO' ? 'Immich video' : gif ? 'Immich GIF' : 'Immich photo');
   return {
-    id, type, name: typeof originalFileName === 'string' && originalFileName.trim() ? originalFileName : (type === 'VIDEO' ? 'Immich video' : 'Immich photo'),
+    id, kind: type === 'VIDEO' ? 'video' : gif ? 'gif' : 'image',
+    name: gif && !/\.gif$/i.test(name) ? name + '.gif' : name,
     date: typeof fileCreatedAt === 'string' ? fileCreatedAt : '',
     duration: typeof duration === 'string' ? duration : '',
   };
@@ -50,7 +56,7 @@ export class ImmichClient {
     if (!key.trim()) throw new Error('Add an Immich API key in Media Hub settings.');
   }
 
-  private async request(path: string, body?: object): Promise<RequestUrlResponse> {
+  private async request(path: string, body?: object, accessError = 'Immich denied access. Check the API key and its permissions.'): Promise<RequestUrlResponse> {
     let response: RequestUrlResponse;
     try {
       response = await this.transport({
@@ -61,7 +67,7 @@ export class ImmichClient {
         throw: false,
       });
     } catch { throw new Error('Could not reach Immich. Check the server URL and your network.'); }
-    if (response.status === 401 || response.status === 403) throw new Error('Immich denied access. Check the API key and its permissions.');
+    if (response.status === 401 || response.status === 403) throw new Error(accessError);
     if (response.status === 404) throw new Error('Immich could not find this item or API endpoint.');
     if (response.status < 200 || response.status >= 300) throw new Error(`Immich returned HTTP ${response.status}.`);
     return response;
@@ -87,14 +93,16 @@ export class ImmichClient {
     const name = query.name?.trim();
     const data = object(await this.json('/search/metadata', {
       page, size: query.size ?? 48, order: query.order ?? 'desc', withExif: false,
-      ...(query.type ? { type: query.type } : {}),
+      ...(query.kind ? { type: query.kind === 'video' ? 'VIDEO' : 'IMAGE' } : {}),
+      // Immich indexes GIFs as IMAGE. Narrow GIF searches on the server; verify the format below.
+      ...(query.kind === 'gif' ? { originalPath: '.gif' } : {}),
       ...(query.album ? { albumIds: [idPath(query.album)] } : {}),
       ...(name ? { originalFileName: name } : {}),
     }));
     const assets = object(data.assets);
     if (!Array.isArray(assets.items)) throw new Error('Immich returned an unexpected media list.');
     const next = Number(assets.nextPage);
-    return { items: assets.items.map(readAsset).filter((item): item is ImmichAsset => item !== null), nextPage: Number.isSafeInteger(next) && next > page ? next : null };
+    return { items: assets.items.map(readAsset).filter((item): item is ImmichAsset => item !== null && (!query.kind || item.kind === query.kind)), nextPage: Number.isSafeInteger(next) && next > page ? next : null };
   }
 
   async asset(id: string): Promise<ImmichAsset> {
@@ -106,6 +114,14 @@ export class ImmichClient {
   async image(id: string, size: 'thumbnail' | 'preview'): Promise<Blob> {
     const response = await this.request('/assets/' + idPath(id) + '/thumbnail?size=' + size);
     return this.mediaBlob(response, 'image');
+  }
+
+  async gif(id: string): Promise<Blob> {
+    const response = await this.request('/assets/' + idPath(id) + '/original', undefined,
+      'To play this GIF, use an Immich API key with asset.download permission.');
+    const blob = this.mediaBlob(response, 'image');
+    if (blob.type !== 'image/gif') throw new Error('Immich did not return an animated GIF.');
+    return blob;
   }
 
   async video(id: string): Promise<Blob> {

@@ -51,17 +51,16 @@ export class ImmichPlayback {
     image.hidden = true;
     const status = el(stage, 'p', 'vg-immich-status', 'Loading preview…');
     status.setAttribute('role', 'status');
-    const size = asset.type === 'VIDEO' ? 'thumbnail' : 'preview';
-    void client.image(asset.id, size).then(blob => {
+    void this.previewImage(asset, client).then(({ blob, message }) => {
       if (this.video) return;
       const url = this.urls.make(blob);
       if (!url) return;
       image.onerror = () => { image.hidden = true; if (!this.video) status.textContent = 'Preview unavailable.'; };
       image.src = url; image.hidden = false;
-      if (!this.loadingVideo) status.textContent = '';
+      if (!this.loadingVideo) status.textContent = message;
     }).catch(error => { if (!this.closed && !this.video) status.textContent = immichError(error); });
 
-    if (asset.type === 'VIDEO') {
+    if (asset.kind === 'video') {
       const play = button(actions, 'Play video', null, () => {
         play.disabled = true; this.loadingVideo = true;
         status.textContent = 'Loading video…';
@@ -83,6 +82,20 @@ export class ImmichPlayback {
       });
     }
     openInImmich(actions, client.server, asset.id);
+  }
+
+  private async previewImage(asset: ImmichAsset, client: ImmichClient): Promise<{ blob: Blob; message: string }> {
+    if (asset.kind !== 'gif') {
+      return { blob: await client.image(asset.id, asset.kind === 'video' ? 'thumbnail' : 'preview'), message: '' };
+    }
+    try {
+      return { blob: await client.gif(asset.id), message: '' };
+    } catch (error) {
+      if (this.closed) throw error;
+      // Keep a still preview when the API key only allows viewing derived media.
+      try { return { blob: await client.image(asset.id, 'thumbnail'), message: immichError(error) }; }
+      catch { throw error; }
+    }
   }
 
   dispose(): void {

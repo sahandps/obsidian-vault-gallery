@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Sahand (sahandps)
 // SPDX-License-Identifier: GPL-3.0-only
-import type { ImmichAlbum, ImmichAsset, ImmichClient } from '../../backend/immich/client';
+import type { ImmichAlbum, ImmichAsset, ImmichClient, ImmichMediaKind } from '../../backend/immich/client';
 import { referenceMarkdown } from '../../backend/immich/references';
 import type MediaHubPlugin from '../../plugin';
 import { button, el } from '../dom';
@@ -32,13 +32,13 @@ export class ImmichLibrary {
   private readonly more: HTMLButtonElement;
   private readonly search: HTMLInputElement;
   private readonly sort: HTMLSelectElement;
-  private readonly tabs = new Map<ImmichAsset['type'] | '', HTMLButtonElement>();
+  private readonly tabs = new Map<ImmichMediaKind | '', HTMLButtonElement>();
   private client: ImmichClient | null = null;
   private album: string | null = null;
   private albums: ImmichAlbum[] = [];
   private assets: ImmichAsset[] = [];
   private nextPage: number | null = null;
-  private kind: ImmichAsset['type'] | '' = '';
+  private kind: ImmichMediaKind | '' = '';
   private generation = 0;
   private connectionGeneration = 0;
   private thumbnailQueue: (() => Promise<void>)[] = [];
@@ -53,7 +53,7 @@ export class ImmichLibrary {
     this.element.hidden = true;
     const nav = el(this.element, 'nav', 'vg-tabs');
     nav.setAttribute('aria-label', 'Immich media types');
-    for (const [value, label, icon] of [['', 'All media', 'layout-grid'], ['IMAGE', 'Images', 'image'], ['VIDEO', 'Videos', 'film']] as const) {
+    for (const [value, label, icon] of [['', 'All media', 'layout-grid'], ['image', 'Images', 'image'], ['gif', 'GIFs', 'clapperboard'], ['video', 'Videos', 'film']] as const) {
       const tab = button(nav, label, icon, () => { this.kind = value; this.reload(); }, 'vg-tab');
       el(tab, 'span', '', label);
       this.tabs.set(value, tab);
@@ -203,7 +203,7 @@ export class ImmichLibrary {
     this.status.textContent = 'Loading Immich media…';
     try {
       const result = await client.search({
-        album: this.album ?? undefined, type: this.kind || undefined, name: this.search.value, page,
+        album: this.album ?? undefined, kind: this.kind || undefined, name: this.search.value, page,
         order: this.sort.value === 'asc' ? 'asc' : 'desc',
       });
       if (this.generation !== generation) return;
@@ -216,7 +216,7 @@ export class ImmichLibrary {
       this.nextPage = result.nextPage;
       this.more.hidden = this.nextPage === null;
       this.host.count(this.assets.length);
-      this.status.textContent = this.assets.length ? '' : 'No matching media.';
+      this.status.textContent = this.assets.length ? '' : (this.nextPage === null ? 'No matching media.' : 'No matching media on this page. Load more to continue.');
       this.syncSelection();
     } catch (error) {
       if (this.generation !== generation) return;
@@ -241,8 +241,8 @@ export class ImmichLibrary {
       this.selection.toggle(asset.id, checkbox.checked, event.shiftKey, this.assets.map(item => item.id)); this.syncSelection();
     });
     const thumb = el(opener, 'div', 'vg-thumb');
-    const placeholder = el(thumb, 'span', 'vg-no-preview', asset.type === 'VIDEO' ? 'Select to play' : 'Loading thumbnail…');
-    if (asset.type !== 'VIDEO' || this.plugin.data.videoThumbnails) {
+    const placeholder = el(thumb, 'span', 'vg-no-preview', asset.kind === 'video' ? 'Select to play' : 'Loading thumbnail…');
+    if (asset.kind !== 'video' || this.plugin.data.videoThumbnails) {
       const img = el(thumb, 'img'); img.alt = ''; img.hidden = true; img.decoding = 'async';
       this.thumbnails ??= new LazyLoader(this.scroll, this.element.ownerDocument);
       this.thumbnails.watch(thumb, () => this.queueThumbnail(async () => {
@@ -259,7 +259,7 @@ export class ImmichLibrary {
       }));
     }
     const suffix = /\.([a-z0-9]{1,6})$/i.exec(asset.name)?.[1].toUpperCase();
-    el(thumb, 'span', 'vg-badge', (suffix ?? (asset.type === 'VIDEO' ? 'VIDEO' : 'IMAGE')) + (asset.duration && asset.type === 'VIDEO' ? ' · ' + asset.duration : ''));
+    el(thumb, 'span', 'vg-badge', (suffix ?? (asset.kind === 'video' ? 'VIDEO' : 'IMAGE')) + (asset.duration && asset.kind === 'video' ? ' · ' + asset.duration : ''));
     const info = el(opener, 'div', 'vg-card-info');
     el(info, 'div', 'vg-card-name', asset.name);
     const date = new Date(asset.date);

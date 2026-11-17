@@ -12,7 +12,7 @@ export function renderImmichSettings(container: HTMLElement, plugin: MediaHubPlu
     el(section, 'p', 'vg-setting-hint', 'Immich requires Obsidian 1.11.4 or newer for API key storage.');
     return;
   }
-  el(section, 'p', 'vg-setting-hint', 'Browse and reference media without importing files. In Immich, create an API key with asset.read, asset.view, and album.read permissions.');
+  el(section, 'p', 'vg-setting-hint', 'Browse and reference media without importing files. In Immich, create an API key with asset.read, asset.view, and album.read permissions. Add asset.download to play GIFs.');
   const serverLabel = el(section, 'label', 'vg-setting-field', 'Server URL');
   const server = el(serverLabel, 'input'); server.type = 'url'; server.placeholder = 'https://photos.example.com'; server.value = plugin.data.immich?.server ?? '';
   const keyLabel = el(section, 'label', 'vg-setting-field', 'API key');

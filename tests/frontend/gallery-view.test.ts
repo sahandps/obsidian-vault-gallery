@@ -462,6 +462,9 @@ test('Immich connects, browses paged media, plays on demand and inserts an authe
   const album = '995358bd-92f8-47f4-8c70-eadf4b53582a';
   const photo = { id: '1a8bd022-59ed-4f42-ad09-c96415d85b87', type: 'IMAGE', originalFileName: 'coast.jpg', fileCreatedAt: '2026-10-29T00:00:00Z' };
   const video = { id: '8ae779db-d4ae-4fc8-8b2b-f27bd4fb8e31', type: 'VIDEO', originalFileName: 'ferry.mp4', fileCreatedAt: '2026-10-28T00:00:00Z', duration: '00:00:04.000' };
+  const gif = { id: '602c4c2f-6927-4631-82ed-98b377823aef', type: 'IMAGE', originalFileName: 'Orbit', originalPath: 'upload/602c4c2f.GIF', originalMimeType: 'image/gif' };
+  const animatedGif = await (await import('node:fs/promises')).readFile('preview/assets/orbit.gif');
+  let allowOriginalGif = false;
   const key = 'fixture-private-key';
   const calls: Array<{ url: string; method: string; auth: string | undefined; body: any }> = [];
   const router = createServer((req, res) => {
@@ -476,10 +479,19 @@ test('Immich connects, browses paged media, plays on demand and inserts an authe
       if (auth !== key) { res.statusCode = 401; return json({ message: 'Bad key' }); }
       if (url === '/api/albums') return json([{ id: album, albumName: 'West coast', assetCount: 2 }]);
       if (url === '/api/search/metadata' && req.method === 'POST') {
+        if (body.originalPath === '.gif') {
+          return json({ assets: { items: [gif], nextPage: null } });
+        }
+        if (body.type === 'IMAGE') return json({ assets: { items: [photo, gif], nextPage: null } });
         const videoOnly = body.type === 'VIDEO' || body.originalFileName === 'ferry';
         return json({ assets: { items: [body.page === 2 || videoOnly ? video : photo], nextPage: body.page === 1 && body.size > 1 && !videoOnly ? '2' : null } });
       }
       if (url === '/api/assets/' + photo.id) return json(photo);
+      if (url === '/api/assets/' + gif.id) return json(gif);
+      if (url === '/api/assets/' + gif.id + '/original') {
+        if (!allowOriginalGif) { res.statusCode = 403; return json({ message: 'Missing asset.download' }); }
+        res.setHeader('Content-Type', 'image/gif'); return res.end(animatedGif);
+      }
       if (url.match(/^\/api\/assets\/[^/]+\/thumbnail\?size=(thumbnail|preview)$/)) {
         res.setHeader('Content-Type', 'image/png'); return res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR2gAAAAASUVORK5CYII=', 'base64'));
       }
@@ -566,6 +578,34 @@ test('Immich connects, browses paged media, plays on demand and inserts an authe
     await tick();
     assert.equal(calls.length, requestsBefore);
     assert.match(embed.textContent ?? '', /Connect this Immich server/);
+
+    const remoteClick = (label: string) => {
+      const target = doc.querySelector<HTMLButtonElement>(`.vg-immich-library button[aria-label="${label}"]`);
+      assert.ok(target);
+      target.click();
+    };
+    remoteClick('Images');
+    await eventually(() => Boolean(doc.querySelector('.vg-immich-library button[aria-label="Preview coast.jpg"]')));
+    assert.equal(doc.querySelectorAll('.vg-immich-library .vg-card').length, 1);
+    remoteClick('GIFs');
+    await eventually(() => Boolean(doc.querySelector('.vg-immich-library button[aria-label="Preview Orbit.gif"]')));
+    assert.ok(calls.some(call => call.body?.type === 'IMAGE' && call.body?.originalPath === '.gif' && call.body?.albumIds?.[0] === album));
+    assert.ok(!calls.some(call => call.url.endsWith('/original')), 'The GIF grid only needs thumbnails.');
+    remoteClick('Preview Orbit.gif');
+    await eventually(() => Boolean(doc.querySelector('.vg-immich-modal img[src^="blob:"]')));
+    assert.match(doc.querySelector('.vg-immich-modal')?.textContent ?? '', /asset.download/);
+    click('Close dialog');
+
+    allowOriginalGif = true;
+    const animated = doc.body.appendChild(doc.createElement('div'));
+    processor(JSON.stringify({ server, id: gif.id }), animated, { addChild: (child: any) => { renderer = child; child.onload(); } });
+    await eventually(() => Boolean(animated.querySelector('img[src^="blob:"]')));
+    const blob = await (await fetch(animated.querySelector<HTMLImageElement>('img')!.src)).blob();
+    assert.equal(blob.type, 'image/gif');
+    assert.deepEqual(Buffer.from(await blob.arrayBuffer()), animatedGif);
+    assert.equal(animated.querySelector('video'), null);
+    renderer.onunload();
+    assert.deepEqual(created, []);
 
     const secretId = plugin.data.immich.secretId;
     await plugin.disconnectImmich();
